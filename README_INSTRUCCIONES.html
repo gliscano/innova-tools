@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INNOVA — Cortador de Fondos · Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0f0e0c;
+  --paper: #f6f1e8;
+  --paper-2: #ede5d3;
+  --accent: #c2410c;
+  --accent-soft: #fed7aa;
+  --rule: #d6cdb8;
+  --muted: #6b6357;
+  --warn-bg: #fff4e0;
+  --warn-border: #c2410c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.65;
+  font-size: 16px;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+.grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  opacity: 0.04; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* === HEADER === */
+header {
+  border-bottom: 1px solid var(--rule);
+  padding: 32px 0 28px;
+  margin-bottom: 60px;
+  position: relative;
+}
+.header-inner {
+  max-width: 880px; margin: 0 auto; padding: 0 32px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.brand span { color: var(--accent); }
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* === LAYOUT === */
+.container { max-width: 880px; margin: 0 auto; padding: 0 32px 120px; }
+
+/* === HERO === */
+.hero { margin-bottom: 80px; }
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 14px;
+}
+.eyebrow::after {
+  content: ''; flex: 1; height: 1px; background: var(--rule);
+}
+h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(42px, 6vw, 76px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  margin-bottom: 24px;
+  font-variation-settings: "opsz" 144;
+}
+h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+.lead {
+  font-family: 'Fraunces', serif;
+  font-size: 21px;
+  line-height: 1.45;
+  font-weight: 300;
+  max-width: 640px;
+  color: var(--ink);
+  font-variation-settings: "opsz" 36;
+}
+
+/* === SECTIONS === */
+section { margin-bottom: 72px; }
+h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 36px;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  font-variation-settings: "opsz" 72;
+}
+.section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  display: block;
+  margin-bottom: 12px;
+}
+.section-rule {
+  height: 1px; background: var(--ink);
+  margin: 28px 0 32px; width: 100%;
+}
+h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  margin: 36px 0 14px;
+}
+p { margin-bottom: 16px; max-width: 680px; }
+p strong { font-weight: 600; }
+
+/* === LISTS === */
+ul, ol { margin: 0 0 20px 0; padding-left: 0; max-width: 680px; }
+ul li, ol li {
+  list-style: none;
+  position: relative;
+  padding: 10px 0 10px 44px;
+  border-bottom: 1px solid var(--rule);
+}
+ul li:last-child, ol li:last-child { border-bottom: none; }
+ol { counter-reset: step; }
+ol li::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero);
+  position: absolute; left: 0; top: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+}
+ul li::before {
+  content: ''; position: absolute;
+  left: 12px; top: 22px; width: 16px; height: 1px;
+  background: var(--accent);
+}
+
+/* === BADGE DEMO === */
+.badge-demo {
+  display: inline-flex; align-items: center; gap: 14px;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 16px 20px; margin: 20px 0;
+  max-width: 680px;
+}
+.badge-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 500;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid var(--rule);
+  padding: 6px 16px; border-radius: 20px;
+  color: var(--ink); white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+.badge-desc { font-size: 13.5px; color: var(--muted); }
+
+/* === WARNING === */
+.warning {
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn-border);
+  padding: 22px 26px;
+  margin: 28px 0;
+  max-width: 680px;
+  position: relative;
+}
+.warning::before {
+  content: 'ATENCIÓN';
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--warn-border);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 8px;
+}
+.warning p { margin: 0; }
+
+/* === CODE === */
+code, .code-block {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+code {
+  background: var(--paper-2);
+  padding: 2px 7px;
+  border-radius: 2px;
+  color: var(--accent);
+}
+.code-block {
+  display: block;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 18px 22px;
+  margin: 18px 0;
+  max-width: 680px;
+  border-left: 3px solid var(--accent);
+  overflow-x: auto;
+  line-height: 1.8;
+}
+
+/* === TABLE === */
+.logic-table {
+  width: 100%; max-width: 880px;
+  border-collapse: collapse;
+  margin: 28px 0;
+  font-size: 14px;
+}
+.logic-table th {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 14px 16px 14px 0;
+  border-bottom: 1px solid var(--ink);
+  vertical-align: bottom;
+}
+.logic-table td {
+  padding: 18px 16px 18px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.logic-table td:first-child { width: 42%; font-weight: 500; }
+.logic-table td:last-child { color: var(--muted); }
+
+/* === FAQ === */
+.faq details {
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 0;
+  max-width: 680px;
+}
+.faq summary {
+  cursor: pointer; list-style: none;
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+'; font-family: 'JetBrains Mono', monospace;
+  color: var(--accent); font-size: 22px; font-weight: 300;
+  transition: transform 0.2s;
+}
+.faq details[open] summary::after { content: '−'; }
+.faq details[open] { padding-bottom: 22px; }
+.faq summary + p { margin-top: 14px; color: var(--muted); }
+
+/* === FOOTER === */
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 36px 0;
+  margin-top: 80px;
+}
+.footer-inner {
+  max-width: 880px; margin: 0 auto; padding: 0 32px;
+  display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.footer-inner a { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 600px) {
+  .header-inner, .footer-inner { flex-direction: column; gap: 8px; }
+  .container { padding: 0 24px 80px; }
+  h1 { font-size: 44px; }
+  h2 { font-size: 28px; }
+  .logic-table { font-size: 13px; }
+  .logic-table td:first-child { width: 50%; }
+}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">INNOVA<span>·</span></div>
+    <div class="meta">Manual v2.0 · Cortador de Fondos</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="hero">
+    <div class="eyebrow">Documentación interna</div>
+    <h1>Cortador de Fondos<br>para <em>sublimación</em></h1>
+    <p class="lead">Una herramienta que divide automáticamente los diseños que no entran en el rollo de tela, aplica el solape de costura, graba un código de identificación en cada imagen y calcula los metros lineales para descontar del inventario.</p>
+  </div>
+
+  <!-- § 01 -->
+  <section>
+    <span class="section-num">§ 01 — Introducción</span>
+    <h2>Qué hace esta herramienta</h2>
+    <div class="section-rule"></div>
+    <p>Toma todos los archivos JPG y PNG de una carpeta y, según las medidas de cada diseño, decide automáticamente qué hacer con cada uno:</p>
+    <ul>
+      <li><strong>Si el diseño entra en el rollo de 1.60m</strong> (al menos uno de sus lados mide 1.60m o menos): lo guarda en la carpeta de salida con su código de identificación grabado en la esquina superior derecha.</li>
+      <li><strong>Si ambos lados superan 1.60m:</strong> lo divide en dos paños con un solape de costura de 0.45cm a cada lado del corte. El script elige automáticamente si conviene cortar vertical (izquierdo/derecho) u horizontal (superior/inferior), priorizando la costura menos visible y minimizando el desperdicio de tela. Solo el primer paño lleva el badge; ambos llevan el código en el nombre.</li>
+      <li><strong>A cada diseño</strong> se le asigna automáticamente un código correlativo (<code>COD001</code>, <code>COD002</code>…) que se graba como badge en la imagen y al inicio del nombre del archivo en <code>cortados</code>.</li>
+      <li><strong>Al finalizar,</strong> muestra el total de metros lineales de tela necesarios para descontar del inventario.</li>
+    </ul>
+    <p>Todos los archivos finales quedan en una sola carpeta llamada <code>cortados</code>, nombrados como <code>COD001&nbsp;-&nbsp;nombre_original.ext</code>.</p>
+  </section>
+
+  <!-- § 02 -->
+  <section>
+    <span class="section-num">§ 02 — Instalación</span>
+    <h2>Solo la primera vez</h2>
+    <div class="section-rule"></div>
+
+    <h3>Paso 1 — Instalar Python</h3>
+    <p>Python es el programa que necesita la computadora para ejecutar el script. Es gratis y oficial.</p>
+    <ol>
+      <li>Abrir el navegador (Chrome, Edge, Firefox) e ir a: <code>https://www.python.org/downloads/</code></li>
+      <li>Hacer clic en el botón amarillo grande que dice <strong>Download Python</strong> (la versión más reciente está bien).</li>
+      <li>Cuando termine de descargar, hacer doble clic en el archivo descargado (algo como <code>python-3.XX.X-amd64.exe</code>).</li>
+      <li><strong>MUY IMPORTANTE:</strong> En la primera pantalla del instalador, antes de hacer clic en <em>Install Now</em>, marcar la casilla que dice <strong>Add python.exe to PATH</strong> (está en la parte de abajo de la ventana). Si no se marca esta casilla, el script no va a funcionar.</li>
+      <li>Hacer clic en <strong>Install Now</strong> y esperar a que termine.</li>
+      <li>Cuando aparezca <em>Setup was successful</em>, cerrar el instalador.</li>
+      <li><strong>Reiniciar la computadora</strong> (importante para que los cambios tengan efecto).</li>
+    </ol>
+
+    <div class="warning">
+      <p>Si te olvidas de marcar la casilla <strong>Add python.exe to PATH</strong>, el cortador no va a funcionar. Tendrás que desinstalar Python e instalarlo de nuevo marcando esa casilla.</p>
+    </div>
+
+    <h3>Paso 2 — Instalar la librería Pillow</h3>
+    <p>Pillow es la herramienta que el script usa para abrir, cortar y grabar el código en las imágenes.</p>
+    <ol>
+      <li>Hacer clic en el botón de Inicio de Windows y escribir <code>cmd</code></li>
+      <li>Aparece <em>Símbolo del sistema</em>, hacer clic para abrirlo (se abre una ventana negra).</li>
+      <li>Escribir o copiar este comando y presionar ENTER:</li>
+    </ol>
+    <code class="code-block">pip install Pillow</code>
+    <p>Esperar a que termine (va a mostrar un mensaje <em>Successfully installed Pillow...</em>) y cerrar la ventana negra.</p>
+
+    <h3>Paso 3 — Guardar los archivos del cortador</h3>
+    <ol>
+      <li>Crear una carpeta en el escritorio llamada <strong>Cortador Innova</strong> (o donde sea más cómodo).</li>
+      <li>Copiar adentro estos dos archivos: <code>cortador_innova.py</code> (el script principal) y <code>CORTAR_FONDOS.bat</code> (el lanzador para abrir con doble clic).</li>
+    </ol>
+    <p>¡Listo! La instalación ya está hecha. No hay que repetirla nunca más.</p>
+  </section>
+
+  <!-- § 03 -->
+  <section>
+    <span class="section-num">§ 03 — Uso diario</span>
+    <h2>Cómo usar el cortador</h2>
+    <div class="section-rule"></div>
+    <ol>
+      <li>Poner todos los fondos de la semana (JPG y/o PNG) en una carpeta cualquiera.</li>
+      <li>Hacer <strong>doble clic</strong> en <code>CORTAR_FONDOS.bat</code>.</li>
+      <li>Se abre una ventana negra que pide la carpeta. <strong>Arrastrar la carpeta con los fondos hasta la ventana</strong> (el path se va a escribir solo).</li>
+      <li>Presionar <strong>ENTER</strong>.</li>
+      <li>Esperar a que termine. Va a procesar cada archivo y mostrar qué hizo con cada uno.</li>
+      <li>Al final, dentro de la carpeta original aparece una subcarpeta llamada <strong>cortados</strong> con todos los archivos listos para sublimar, nombrados como <code>COD001&nbsp;-&nbsp;nombre_original.ext</code>. Cada imagen tiene el código grabado en la esquina superior derecha.</li>
+      <li>La ventana muestra el total de <strong>metros lineales de tela</strong> que se van a usar — anotar ese número para descontarlo del stock.</li>
+    </ol>
+  </section>
+
+  <!-- § 04 -->
+  <section>
+    <span class="section-num">§ 04 — Identificación</span>
+    <h2>Código de identificación</h2>
+    <div class="section-rule"></div>
+    <p>Al procesar cada imagen el script asigna automáticamente un código correlativo que se graba de dos formas:</p>
+
+    <h3>En la imagen — badge visual</h3>
+    <p>Un badge con texto negro sobre fondo blanco semitransparente aparece en la <strong>esquina superior derecha</strong> de cada archivo en <code>cortados</code>. El tamaño del badge escala en proporción al tamaño de la imagen, por lo que es legible tanto en pantalla como sobre el fondo impreso o sublimado.</p>
+
+    <div class="badge-demo">
+      <span class="badge-pill">COD001</span>
+      <span class="badge-desc">Así se ve el badge sobre la imagen, en la esquina superior derecha</span>
+    </div>
+
+    <h3>En el nombre del archivo</h3>
+    <p>Todos los archivos en <code>cortados</code> incluyen el código al inicio del nombre:</p>
+    <code class="code-block">COD001 - Flor Gonzalez - 290x200.jpg
+COD002 - Maria Soledad - 500x290_IZQUIERDO.jpg
+COD002 - Maria Soledad - 500x290_DERECHO.jpg</code>
+
+    <p>En los diseños que se cortan en dos paños, <strong>solo el primer paño</strong> (IZQUIERDO o SUPERIOR) lleva el badge en la imagen. Ambos paños llevan el código en el nombre del archivo para que puedan asociarse.</p>
+
+    <p>El contador <strong>reinicia en <code>COD001</code></strong> en cada corrida del script.</p>
+
+    <h3>Integración con la herramienta de etiquetado</h3>
+    <p>Los archivos de <code>cortados</code> son compatibles directamente con <strong>INNOVA Etiquetado</strong> (<code>INNOVA_Etiquetado.html</code>). Al cargar la carpeta en esa herramienta, cada diseño aparece automáticamente con su código, cliente, medida y miniatura listos para verificar e imprimir la etiqueta 50×50&nbsp;mm para la impresora DT01.</p>
+  </section>
+
+  <!-- § 05 -->
+  <section>
+    <span class="section-num">§ 05 — Lógica</span>
+    <h2>Cómo se decide el corte</h2>
+    <div class="section-rule"></div>
+    <p>El rollo de tela mide <strong>1.60m de ancho × 10m de largo</strong>. Los paños se apilan en columna para sublimar por calandrado.</p>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Caso</th><th>Acción del script</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Al menos un lado del diseño ≤ 1.60m</td><td>No corta — guarda con código en la imagen</td></tr>
+        <tr><td>Ambos lados &gt; 1.60m, los dos cortes son posibles</td><td>Corte vertical (costura menos visible), salvo que el horizontal ahorre más de 30cm de tela</td></tr>
+        <tr><td>Solo un eje de corte produce paños que entran en el rollo</td><td>Usa ese eje obligatoriamente</td></tr>
+        <tr><td>Ningún corte produce paños que entren</td><td>Marca error (caso especial que necesita tratamiento manual)</td></tr>
+      </tbody>
+    </table>
+    <p>El <strong>solape de costura es de 0.45cm a cada lado del corte</strong> (0.90cm en total), para que la máquina de coser consuma esa parte y el diseño quede continuo al unir los paños.</p>
+  </section>
+
+  <!-- § 06 -->
+  <section class="faq">
+    <span class="section-num">§ 06 — Preguntas frecuentes</span>
+    <h2>FAQ</h2>
+    <div class="section-rule"></div>
+
+    <details>
+      <summary>¿Qué pasa con los archivos originales?</summary>
+      <p>No se modifican. El script solo lee los originales y guarda copias procesadas en la subcarpeta <code>cortados</code>.</p>
+    </details>
+    <details>
+      <summary>¿Qué significa el código COD001 que aparece en los archivos?</summary>
+      <p>Es un identificador correlativo que el script asigna automáticamente a cada diseño de esa corrida. Aparece en la esquina superior derecha de la imagen (badge blanco) y al inicio del nombre del archivo. Permite asociar cada paño físico con su cliente en la herramienta de etiquetado sin depender de la memoria del operador. El contador reinicia en <code>COD001</code> en cada nueva corrida del script.</p>
+    </details>
+    <details>
+      <summary>¿Por qué uno de los dos paños cortados no tiene el badge?</summary>
+      <p>Solo el primer paño (IZQUIERDO o SUPERIOR) lleva el badge en la imagen. El segundo paño (DERECHO o INFERIOR) lleva el código en el nombre del archivo pero no en la imagen, porque con uno basta para identificar el diseño en la mesa de trabajo.</p>
+    </details>
+    <details>
+      <summary>¿El código se puede usar con la herramienta de etiquetado?</summary>
+      <p>Sí. Al cargar la carpeta <code>cortados</code> en <code>INNOVA_Etiquetado.html</code>, la herramienta lee el código del nombre del archivo automáticamente y lo asocia con cada cliente para verificar e imprimir las etiquetas 50×50&nbsp;mm en la DT01.</p>
+    </details>
+    <details>
+      <summary>¿Soporta JPG y PNG?</summary>
+      <p>Sí, ambos formatos. Los PNG conservan transparencia si la tienen.</p>
+    </details>
+    <details>
+      <summary>¿Qué pasa si dejo otros archivos en la carpeta (PDF, PSD, etc.)?</summary>
+      <p>Los ignora. Solo procesa archivos <code>.jpg</code>, <code>.jpeg</code> y <code>.png</code>.</p>
+    </details>
+    <details>
+      <summary>¿Cómo sé cuántos metros de tela voy a usar?</summary>
+      <p>Al final del proceso, la ventana muestra <strong>METROS LINEALES: X.XXm</strong>. Ese es el total a descontar del inventario.</p>
+    </details>
+    <details>
+      <summary>Me aparece el error «python no se reconoce como comando»</summary>
+      <p>Significa que al instalar Python no se marcó la casilla <strong>Add python.exe to PATH</strong>. Solución: desinstalar Python desde Panel de Control → Programas, volver a instalarlo y esta vez marcar esa casilla en la primera pantalla.</p>
+    </details>
+    <details>
+      <summary>¿Puedo cambiar el margen de costura o el ancho del rollo?</summary>
+      <p>Sí, abriendo una terminal y ejecutando el script con opciones. Por ejemplo:</p>
+      <code class="code-block">python cortador_innova.py "C:\Fondos" --margen 0.50 --ancho-rollo 155</code>
+      <p>Para uso normal con doble clic en el <code>.bat</code>, los valores por defecto (0.45cm y 160cm) ya están configurados.</p>
+    </details>
+  </section>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div>© INNOVA · Fondos fotográficos</div>
+    <div><a href="https://innova54.com/">innova54.com</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
