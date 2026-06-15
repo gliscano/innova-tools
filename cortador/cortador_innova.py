@@ -24,18 +24,27 @@ CODIGO DE IDENTIFICACION:
   el badge; ambos panos llevan el codigo en el nombre del archivo.
   El contador reinicia en COD001 en cada corrida del script.
 
+ESTRUCTURA DE CARPETAS RESULTANTE:
+  /Fondos semana/
+    originales/     <- JPG/PNG originales sin modificar
+    cortados/       <- panos procesados con codigo grabado
+    etiquetados/    <- JSON + tabla.pdf + etiquetas.pdf (generados automaticamente)
+
 USO:
   python cortador_innova.py                          -> Usa la carpeta actual
   python cortador_innova.py "C:\ruta\a\carpeta"      -> Usa la carpeta indicada
   python cortador_innova.py --margen 0.50             -> Cambia el margen (cm)
 
 REQUISITOS:
-  pip install Pillow
+  pip install Pillow reportlab
 """
 
 import os
 import sys
 import time
+import shutil
+import datetime
+import subprocess
 import argparse
 from pathlib import Path
 
@@ -87,19 +96,19 @@ def _cargar_fuente(size):
 def grabar_codigo(img_original, codigo_str):
     """
     Devuelve una COPIA de img_original con el badge del codigo grabado
-    en la esquina superior derecha.
+    en la esquina superior derecha, rotado 90 grados en sentido antihorario.
     - Badge: pill blanco al 80% de opacidad.
-    - Texto: negro solido, fuente escalada al 1.2% del lado menor de la imagen.
+    - Fuente: ~0.5% del lado menor de la imagen (min 14px).
     - No modifica la imagen original.
     """
     img = img_original.convert("RGBA")
     w, h = img.size
 
-    # Escalar fuente segun el tamano de la imagen (min 28px para imagenes muy pequenas)
-    font_size = max(28, int(min(w, h) * 0.012))
+    # Fuente pequena: ~0.5% del lado menor, minimo 14px
+    font_size = max(14, int(min(w, h) * 0.005))
     font = _cargar_fuente(font_size)
 
-    # Capa transparente donde se dibuja el badge
+    # Overlay transparente
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
@@ -127,23 +136,26 @@ def grabar_codigo(img_original, codigo_str):
     pill_h = th + pad_y * 2
     radius = pill_h // 2
 
-    # Posicion: esquina superior derecha
-    x1 = w - margin - pill_w
-    y1 = margin
-    x2 = x1 + pill_w
-    y2 = y1 + pill_h
-
-    # Dibujar pill (blanco, alpha 204 ≈ 80%)
+    # Dibujar pill y texto en superficie temporal (texto horizontal)
+    surf_w = pill_w + margin * 2
+    surf_h = pill_h + margin * 2
+    surf = Image.new("RGBA", (surf_w, surf_h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(surf)
+    sx1, sy1 = margin, margin
+    sx2, sy2 = margin + pill_w, margin + pill_h
     try:
-        draw.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=(255, 255, 255, 204))
+        sd.rounded_rectangle([sx1, sy1, sx2, sy2], radius=radius, fill=(255, 255, 255, 204))
     except (AttributeError, TypeError):
-        draw.rectangle([x1, y1, x2, y2], fill=(255, 255, 255, 204))
+        sd.rectangle([sx1, sy1, sx2, sy2], fill=(255, 255, 255, 204))
+    sd.text((sx1 + pad_x + txt_offset_x, sy1 + pad_y + txt_offset_y),
+            codigo_str, font=font, fill=(20, 20, 20, 255))
 
-    # Texto negro solido
-    draw.text(
-        (x1 + pad_x + txt_offset_x, y1 + pad_y + txt_offset_y),
-        codigo_str, font=font, fill=(20, 20, 20, 255)
-    )
+    # Rotar 90 grados antihorario (expand=True intercambia dimensiones)
+    surf = surf.rotate(90, expand=True)
+
+    # Pegar con margen de seguridad de 160px en ambos ejes (evita que la costura tape el badge)
+    MARGEN_COSTURA_PX = 160
+    overlay.paste(surf, (w - surf.width - MARGEN_COSTURA_PX, MARGEN_COSTURA_PX), surf)
 
     return Image.alpha_composite(img, overlay)   # RGBA; el caller convierte si es JPEG
 
@@ -315,12 +327,17 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
     ruta_1 = os.path.join(carpeta_salida, nombre_1)
     ruta_2 = os.path.join(carpeta_salida, nombre_2)
 
-    # Pano 1: lleva el badge del codigo
-    pano_1_con_codigo = grabar_codigo(pano_1, codigo_str)
-    _guardar(pano_1_con_codigo, ruta_1, ext, calidad, dpi_tuple)
-
-    # Pano 2: sin badge (no necesita codigo visual)
-    _guardar(pano_2.convert("RGBA"), ruta_2, ext, calidad, dpi_tuple)
+    # Badge en SUPERIOR (corte horizontal) o DERECHO (corte vertical), siempre invertido
+    if cortar_horizontal:
+        # SUPERIOR lleva el badge
+        _guardar(grabar_codigo(pano_1, codigo_str), ruta_1, ext, calidad, dpi_tuple)
+        _guardar(pano_2.convert("RGBA"),                           ruta_2, ext, calidad, dpi_tuple)
+        pano_badge = nombre_1
+    else:
+        # DERECHO lleva el badge
+        _guardar(pano_1.convert("RGBA"),                           ruta_1, ext, calidad, dpi_tuple)
+        _guardar(grabar_codigo(pano_2, codigo_str), ruta_2, ext, calidad, dpi_tuple)
+        pano_badge = nombre_2
 
     pano_1.close()
     pano_2.close()
@@ -334,8 +351,8 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         f"     Corte: {tipo_corte}\n"
         f"     Razon: {razon}\n"
         f"     Margen de costura: {margen_cm}cm ({margen_px}px)\n"
-        f"     -> {nombre_1}  ({medida_1}) | Lineal: {largo_1 / 100:.2f}m  [codigo grabado]\n"
-        f"     -> {nombre_2}  ({medida_2}) | Lineal: {largo_2 / 100:.2f}m"
+        f"     -> {nombre_1}  ({medida_1}) | Lineal: {largo_1 / 100:.2f}m{'  [codigo grabado]' if nombre_1 == pano_badge else ''}\n"
+        f"     -> {nombre_2}  ({medida_2}) | Lineal: {largo_2 / 100:.2f}m{'  [codigo grabado]' if nombre_2 == pano_badge else ''}"
     )
     return "OK", msg, metros_lineales
 
@@ -388,7 +405,7 @@ def main():
         print(f"\nERROR: La carpeta no existe: {carpeta}")
         sys.exit(1)
 
-    # Buscar archivos de imagen
+    # Buscar archivos de imagen en la raiz de la carpeta
     archivos = sorted([
         f for f in os.listdir(carpeta)
         if Path(f).suffix.lower() in EXTENSIONES
@@ -398,9 +415,11 @@ def main():
         print(f"\nNo se encontraron archivos JPG/PNG en: {carpeta}")
         sys.exit(0)
 
-    # Crear carpeta de salida
-    carpeta_salida = args.salida or os.path.join(carpeta, 'cortados')
-    os.makedirs(carpeta_salida, exist_ok=True)
+    # Crear subcarpetas
+    carpeta_originales = os.path.join(carpeta, 'originales')
+    carpeta_salida     = args.salida or os.path.join(carpeta, 'cortados')
+    os.makedirs(carpeta_originales, exist_ok=True)
+    os.makedirs(carpeta_salida,     exist_ok=True)
 
     # Cabecera
     print("")
@@ -408,7 +427,8 @@ def main():
     print("  INNOVA - Cortador de Fondos para Sublimacion")
     print("=" * 62)
     print(f"  Carpeta:       {carpeta}")
-    print(f"  Salida:        {carpeta_salida}")
+    print(f"  Originales:    {carpeta_originales}")
+    print(f"  Cortados:      {carpeta_salida}")
     print(f"  Archivos:      {len(archivos)} JPG/PNG encontrados")
     print(f"  Margen:        {args.margen}cm")
     print(f"  Ancho rollo:   {args.ancho_rollo}cm")
@@ -418,7 +438,23 @@ def main():
     print("=" * 62)
     print("")
 
-    # Procesar
+    # Mover originales a subcarpeta (mezcla si ya existen)
+    print("  Moviendo originales...")
+    for archivo in archivos:
+        src = os.path.join(carpeta, archivo)
+        dst = os.path.join(carpeta_originales, archivo)
+        try:
+            os.replace(src, dst)          # atomico, sobreescribe si existe
+        except OSError:
+            shutil.copy2(src, dst)        # fallback: copiar + borrar
+            try:
+                os.remove(src)
+            except OSError:
+                pass
+    print(f"  {len(archivos)} archivo(s) -> originales/")
+    print("")
+
+    # Procesar desde originales/
     inicio = time.time()
     cortados = 0
     sin_corte = 0
@@ -429,7 +465,7 @@ def main():
     for i, archivo in enumerate(archivos, 1):
         contador_codigo += 1
         print(f"[{i}/{len(archivos)}] Procesando {archivo}...")
-        ruta = os.path.join(carpeta, archivo)
+        ruta = os.path.join(carpeta_originales, archivo)
         estado, mensaje, metros = procesar_imagen(
             ruta, carpeta_salida,
             args.margen, args.ancho_rollo, args.umbral, args.calidad,
@@ -447,13 +483,13 @@ def main():
         else:
             errores += 1
 
-    # Resumen
+    # Resumen del corte
     duracion = time.time() - inicio
-    total_metros = sum(todos_los_metros) / 100   # cm -> metros
-    total_panos = len(todos_los_metros)
+    total_metros = sum(todos_los_metros) / 100
+    total_panos  = len(todos_los_metros)
 
     print("=" * 62)
-    print("  RESUMEN")
+    print("  RESUMEN CORTE")
     print("-" * 62)
     print(f"  Cortados:      {cortados}")
     print(f"  Sin corte:     {sin_corte}")
@@ -465,6 +501,33 @@ def main():
     print(f"  METROS LINEALES:       {total_metros:.2f}m")
     print("=" * 62)
     print("")
+
+    # Llamar automaticamente al generador de etiquetado
+    # Busca en la misma carpeta del cortador y luego en ../etiquetador/
+    _base = os.path.dirname(os.path.abspath(__file__))
+    _candidatos = [
+        os.path.join(_base, 'generar_lista_etiquetado.py'),
+        os.path.join(_base, '..', 'etiquetador', 'generar_lista_etiquetado.py'),
+    ]
+    script_etiqueta = next((c for c in _candidatos if os.path.exists(c)), None)
+    if script_etiqueta:
+        cierre = datetime.date.today().isoformat()
+        print("=" * 62)
+        print("  INNOVA - Generando lista de etiquetado...")
+        print("=" * 62)
+        print("")
+        subprocess.run(
+            [sys.executable, script_etiqueta,
+             carpeta_salida, '--cierre', cierre, '--sin-pausa'],
+            check=False
+        )
+    else:
+        print("[AVISO] No se encontro generar_lista_etiquetado.py")
+        print("  Coloca ese archivo en la misma carpeta que el cortador.")
+        print("  Luego genera la lista manualmente arrastrando cortados/ al .bat")
+        print("")
+
+    input("Listo. Enter para salir...")
 
 
 if __name__ == '__main__':

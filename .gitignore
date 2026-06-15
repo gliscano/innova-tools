@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Carpetas de salida generadas por los scripts
+# (pueden contener imágenes de clientes y PDFs con datos comerciales)
+originales/
+cortados/
+etiquetados/
+costura/
+
+# Archivos de salida específicos
+*.json
+lista_etiquetado_*.json
+costura_*.pdf
+tabla_*.pdf
+etiquetas_*.pdf
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
