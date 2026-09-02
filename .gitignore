@@ -9,7 +9,7 @@ __pycache__/
 originales/
 cortados/
 etiquetados/
-costura/
+Prubeba imagenes/
 
 # Archivos de salida específicos
 *.json
@@ -17,6 +17,8 @@ lista_etiquetado_*.json
 costura_*.pdf
 tabla_*.pdf
 etiquetas_*.pdf
+*.zip
+*.jpg
 
 # Entornos virtuales
 venv/
