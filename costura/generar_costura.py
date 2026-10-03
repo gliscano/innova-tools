@@ -140,6 +140,30 @@ def calcular_costura(ancho_cm, alto_cm, tipo_especial):
         return "Union de 4,5 m en adelante", PRECIO_UNION_LARGA, False
 
 
+def calcular_costura_real(real, tipo_especial):
+    """
+    Cotiza con el corte que el cortador hizo de verdad (medidas_reales.json:
+    'panos' y 'corte'), no con uno re-deducido. Asi un fondo cortado por pedido
+    del nombre ("horizontal"/"vertical") o por el umbral de desperdicio se cobra
+    con la union correcta.
+    Retorna lo mismo que calcular_costura, o None si el manifiesto no alcanza.
+    """
+    if tipo_especial == "neoprene":
+        return "Piso Neoprene", PRECIO_NEOPRENE, False
+
+    panos = real.get("panos")
+    corte = real.get("corte")
+    if panos == 1:
+        return "1 Pano", PRECIO_1_PANO, False
+    if panos == 2 and corte in ("VERTICAL", "HORIZONTAL"):
+        # La union corre a lo largo del lado que el corte no parte
+        longitud = real["alto_cm"] if corte == "VERTICAL" else real["ancho_cm"]
+        if longitud <= UNION_THRESHOLD_CM:
+            return "Union hasta 4,5 m", PRECIO_UNION_CORTA, False
+        return "Union de 4,5 m en adelante", PRECIO_UNION_LARGA, False
+    return None
+
+
 # =============================================================================
 # PARSEO DE NOMBRES
 # =============================================================================
@@ -218,38 +242,31 @@ def leer_medidas_reales(carpeta):
             m = COD_RE.search(k)
             if m:
                 normalizado["cod." + str(int(m.group(1))).zfill(4)] = v
-        print("  [ok] Medidas reales de %d diseno(s) desde %s" % (len(normalizado), MANIFIESTO))
         return normalizado
     except Exception as e:
         print("  [aviso] No se pudo leer %s (%s): se usa la medida del nombre." % (MANIFIESTO, e))
         return {}
 
 
-def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False):
+def cotizar(carpeta_origen):
     """
-    Genera costura_<cierre>.pdf en carpeta hermana 'costura/'.
-    Retorna la ruta del PDF o None si no hay archivos.
+    Cotiza la costura de los fondos en 'cortados/' sin generar nada en disco.
+    Retorna None si no hay nada que cotizar, o un dict con:
+      filas            -> [(nro, codigo, cliente, medida, detalle, precio_str, adv)]
+      subtotal         -> suma de precios + viaticos
+      total_redondeado -> subtotal redondeado al proximo multiplo de 1.000
+      advertencias     -> archivos a cotizar manualmente (sin precio)
     """
     carpeta = os.path.abspath(carpeta_origen)
     if not os.path.isdir(carpeta):
         print("[COSTURA] ERROR: carpeta no encontrada:", carpeta)
         return None
 
-    costura_dir = os.path.join(os.path.dirname(carpeta), "costura")
-    os.makedirs(costura_dir, exist_ok=True)
-
     archivos = sorted(f for f in os.listdir(carpeta) if f.lower().endswith(IMG_EXT))
     if not archivos:
         print("[COSTURA] No se encontraron imagenes en:", carpeta)
         return None
 
-    if not cierre:
-        cierre = datetime.date.today().isoformat()
-
-    safe    = re.sub(r"[^\w\-]+", "-", cierre)
-    ruta_pdf = os.path.join(costura_dir, "costura_%s.pdf" % safe)
-
-    # -- procesar -----------------------------------------------------------
     filas_data   = []
     total_acum   = 0
     advertencias = []
@@ -276,7 +293,10 @@ def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False):
             continue
         vistos.add(key)
 
-        desc, precio, adv = calcular_costura(ancho_cm, alto_cm, tipo_especial)
+        cotizado = calcular_costura_real(real, tipo_especial) if real else None
+        if cotizado is None:
+            cotizado = calcular_costura(ancho_cm, alto_cm, tipo_especial)
+        desc, precio, adv = cotizado
         medida_str = "%.0f x %.0f cm" % (ancho_cm, alto_cm)
 
         if adv:
@@ -293,6 +313,40 @@ def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False):
         print("[COSTURA] No se pudo procesar ningun archivo.")
         return None
 
+    subtotal = total_acum + VIATICOS
+    return {
+        "filas":            filas_data,
+        "subtotal":         subtotal,
+        "total_redondeado": math.ceil(subtotal / 1_000) * 1_000,
+        "advertencias":     advertencias,
+    }
+
+
+def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False, cot=None):
+    """
+    Genera costura_<cierre>.pdf en carpeta hermana 'costura/'.
+    cot: resultado de cotizar() si el llamador ya lo tiene (evita recalcular).
+    Retorna la ruta del PDF o None si no hay archivos.
+    """
+    carpeta = os.path.abspath(carpeta_origen)
+    if cot is None:
+        cot = cotizar(carpeta)
+    if cot is None:
+        return None
+
+    costura_dir = os.path.join(os.path.dirname(carpeta), "costura")
+    os.makedirs(costura_dir, exist_ok=True)
+
+    if not cierre:
+        cierre = datetime.date.today().isoformat()
+
+    safe    = re.sub(r"[^\w\-]+", "-", cierre)
+    ruta_pdf = os.path.join(costura_dir, "costura_%s.pdf" % safe)
+
+    filas_data       = cot["filas"]
+    advertencias     = cot["advertencias"]
+    subtotal         = cot["subtotal"]
+    total_redondeado = cot["total_redondeado"]
     n = len(filas_data)
 
     # -- tabla --------------------------------------------------------------
@@ -318,9 +372,6 @@ def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False):
              bold=True, align=TA_RIGHT, color=AZUL_MED),
         _cel(""),
     ])
-
-    subtotal         = total_acum + VIATICOS
-    total_redondeado = math.ceil(subtotal / 1_000) * 1_000
 
     tabla_filas.append([
         _cel(""), _cel(""), _cel(""), _cel(""),
@@ -431,20 +482,22 @@ def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False):
             story.append(Paragraph("  - " + a, s_a))
 
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
+    return ruta_pdf
 
-    # -- consola ------------------------------------------------------------
+
+def imprimir_detalle(cot, ruta_pdf):
+    """Cuadro de consola con el detalle (solo en modo manual: en la corrida
+    encadenada el etiquetador muestra un estado y el resumen de produccion)."""
     print("\n" + "=" * 54)
-    print(" COSTURA: %d fondo(s) procesado(s)" % n)
-    if advertencias:
-        print(" ATENCION: %d con +2 panos (sin precio)" % len(advertencias))
+    print(" COSTURA: %d fondo(s) procesado(s)" % len(cot["filas"]))
+    if cot["advertencias"]:
+        print(" ATENCION: %d con +2 panos (sin precio)" % len(cot["advertencias"]))
     print("")
-    print("  Subtotal bruto  : $ {:,.0f}".format(subtotal).replace(",", "."))
-    print("  Total redondeado: $ {:,.0f}".format(total_redondeado).replace(",", "."))
+    print("  Subtotal bruto  : $ {:,.0f}".format(cot["subtotal"]).replace(",", "."))
+    print("  Total redondeado: $ {:,.0f}".format(cot["total_redondeado"]).replace(",", "."))
     print("")
     print("  PDF costura -> %s" % ruta_pdf)
     print("=" * 54 + "\n")
-
-    return ruta_pdf
 
 
 # =============================================================================
@@ -478,7 +531,11 @@ def main():
             input("Enter para salir...")
         sys.exit(1)
 
-    generar_pdf_costura(carpeta, cierre=args.cierre, sin_pausa=args.sin_pausa)
+    cot = cotizar(carpeta)
+    if cot:
+        ruta_pdf = generar_pdf_costura(carpeta, cierre=args.cierre,
+                                       sin_pausa=args.sin_pausa, cot=cot)
+        imprimir_detalle(cot, ruta_pdf)
 
     if not args.sin_pausa:
         input("Listo. Enter para salir...")

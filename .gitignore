@@ -9,7 +9,7 @@ __pycache__/
 originales/
 cortados/
 etiquetados/
-Prubeba imagenes/
+Prueba imagenes/
 
 # Archivos de salida específicos
 *.json

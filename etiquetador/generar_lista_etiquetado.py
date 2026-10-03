@@ -28,22 +28,88 @@ USO por terminal:
 import os, sys, re, json, base64, datetime, argparse
 from io import BytesIO
 
-# -- costura (opcional: si no se encuentra el script, se omite silenciosamente)
-def _intentar_costura(carpeta, cierre, sin_pausa):
+# -- costura (opcional: si no se encuentra el script, se omite)
+def _cargar_costura():
+    """Carga generar_costura.py junto a este script (carpeta aplanada que se
+    entrega al personal) o en ../costura/ (repo). Devuelve el modulo o None."""
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        costura_py = os.path.join(script_dir, "..", "costura", "generar_costura.py")
-        costura_py = os.path.normpath(costura_py)
-        if not os.path.isfile(costura_py):
+        candidatos = [
+            os.path.join(script_dir, "generar_costura.py"),
+            os.path.normpath(os.path.join(script_dir, "..", "costura", "generar_costura.py")),
+        ]
+        costura_py = next((c for c in candidatos if os.path.isfile(c)), None)
+        if not costura_py:
             print("[COSTURA] generar_costura.py no encontrado, se omite.")
-            return
+            return None
         import importlib.util
         spec   = importlib.util.spec_from_file_location("generar_costura", costura_py)
         modulo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(modulo)
-        modulo.generar_pdf_costura(carpeta, cierre=cierre, sin_pausa=sin_pausa)
+        return modulo
     except Exception as e:
-        print("[COSTURA] Error al generar lista de costura: %s" % e)
+        print("[COSTURA] Error al cargar generar_costura.py: %s" % e)
+        return None
+
+
+def _leer_metros(carpeta):
+    """Metros lineales por tipo de tela desde cortados/medidas_reales.json,
+    que escribe el cortador. Devuelve (poliester_m, neoprene_m) o (None, None)."""
+    ruta = os.path.join(carpeta, "medidas_reales.json")
+    if not os.path.isfile(ruta):
+        print("  [aviso] No hay medidas_reales.json: el resumen sale sin metros.")
+        return None, None
+    try:
+        with open(ruta, encoding="utf-8") as fh:
+            disenos = json.load(fh).get("disenos", [])
+        if any("metros_lineales" not in d for d in disenos if d.get("panos")):
+            print("  [aviso] medidas_reales.json es de una version anterior: "
+                  "el resumen sale sin metros.")
+            return None, None
+        poli = neo = 0.0
+        for d in disenos:
+            m = d.get("metros_lineales") or 0
+            if d.get("tela") == "neoprene":
+                neo += m
+            else:
+                poli += m
+        return poli, neo
+    except Exception as e:
+        print("  [aviso] No se pudo leer medidas_reales.json (%s)." % e)
+        return None, None
+
+
+def armar_resumen(carpeta, cot):
+    """Resumen de produccion: metros por tela, sublimacion (ambas) y costura."""
+    poli, neo = _leer_metros(carpeta)
+    return {
+        "poliester_m":    poli,
+        "neoprene_m":     neo,
+        "sublimacion_m":  None if poli is None else poli + neo,
+        "costura_total":  cot["total_redondeado"] if cot else None,
+        "costura_manual": len(cot["advertencias"]) if cot else 0,
+    }
+
+
+def _fmt_metros(m):
+    return "sin datos" if m is None else "%.2f m" % m
+
+
+def _fmt_pesos(p):
+    return "sin datos" if p is None else "$ {:,.0f}".format(p).replace(",", ".")
+
+
+def lineas_resumen(r):
+    """Pares (etiqueta, valor) del resumen, compartidos por consola y PDF."""
+    costura = _fmt_pesos(r["costura_total"])
+    if r["costura_manual"]:
+        costura += "  (+%d a cotizar manual)" % r["costura_manual"]
+    return [
+        ("Tela poliéster",       _fmt_metros(r["poliester_m"])),
+        ("Tela neoprene",        _fmt_metros(r["neoprene_m"])),
+        ("Sublimación (total)",  _fmt_metros(r["sublimacion_m"])),
+        ("Total costura",        costura),
+    ]
 
 # ── dependencias ───────────────────────────────────────────────────────────
 try:
@@ -81,6 +147,7 @@ SUF_RE = re.compile(
     r"\b(izq|der|sup|inf|izquierd[oa]|derech[oa]|superior|inferior|pa[\u00f1n]o\s*\d*)\b",
     re.IGNORECASE
 )
+PANO_RE = re.compile(r"_(izquierdo|derecho|superior|inferior)$", re.IGNORECASE)
 
 # ── colores marca ─────────────────────────────────────────────────────────
 ACCENT = colors.HexColor("#c2410c")
@@ -147,6 +214,9 @@ def parse_name(filename):
         obs = base[med.end():]
     cliente = clean(cliente)
     cliente = title_case(cliente) if cliente else "(sin nombre)"
+    # Sufijo de pano que agrega el cortador ("..._INFERIOR"): el "_" no es
+    # limite de palabra para SUF_RE, asi que se quita aparte.
+    obs = PANO_RE.sub("", clean(obs))
     obs = clean(SUF_RE.sub("", clean(obs)))
     if obs.lower() == "x":
         obs = ""
@@ -206,8 +276,35 @@ class CheckBox(Flowable):
 
 # ═══════════════════════ PDF TABLA ════════════════════════════════════════
 
-def generar_pdf_tabla(designs, cierre, ruta_salida):
-    """Tabla A4 con encabezado Innova, miniaturas y checkbox por diseno."""
+def _bloque_resumen(resumen):
+    """Cuadro 'Resumen de produccion' que encabeza la primera pagina."""
+    sti = ParagraphStyle("rti", fontName="Helvetica-Bold", fontSize=10, textColor=INK,    leading=13)
+    set_ = ParagraphStyle("ret", fontName="Helvetica",     fontSize=9,  textColor=MUTED,  leading=11)
+    sva = ParagraphStyle("rva", fontName="Helvetica-Bold", fontSize=10, textColor=INK,    leading=12)
+    data = [[Paragraph("RESUMEN DE PRODUCCIÓN", sti), ""]]
+    for etiqueta, valor in lineas_resumen(resumen):
+        data.append([Paragraph(etiqueta, set_), Paragraph(valor, sva)])
+    t = Table(data, colWidths=[60*mm, 118*mm])
+    t.setStyle(TableStyle([
+        ("SPAN",          (0,0), (-1,0)),
+        ("BACKGROUND",    (0,0), (-1,0),  PAPER2),
+        ("LINEBELOW",     (0,0), (-1,0),  1.0, INK),
+        ("BACKGROUND",    (0,1), (-1,-1), PAPER),
+        ("LINEBELOW",     (0,1), (-1,-2), 0.4, RULE),
+        ("LINEABOVE",     (0,-1),(-1,-1), 0.8, ACCENT),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ("LEFTPADDING",   (0,0), (-1,-1), 5),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 5),
+        ("BOX",           (0,0), (-1,-1), 0.8, RULE),
+    ]))
+    return t
+
+
+def generar_pdf_tabla(designs, cierre, ruta_salida, resumen=None):
+    """Tabla A4 con encabezado Innova, miniaturas y checkbox por diseno.
+    Si se pasa 'resumen' (armar_resumen), la primera pagina lo lleva arriba."""
 
     ss  = getSampleStyleSheet()
     slb = ParagraphStyle("lbl", fontName="Helvetica",      fontSize=7,  textColor=ACCENT, leading=9)
@@ -298,9 +395,11 @@ def generar_pdf_tabla(designs, cierre, ruta_salida):
         topMargin=15*mm, bottomMargin=14*mm,
         title="INNOVA - Lista de etiquetado - " + cierre,
     )
-    doc.build([Spacer(1, 6*mm), tabla],
-              onFirstPage=on_page, onLaterPages=on_page)
-    print("  [PDF tabla]     %s" % ruta_salida)
+    story = [Spacer(1, 6*mm)]
+    if resumen:
+        story += [_bloque_resumen(resumen), Spacer(1, 6*mm)]
+    story.append(tabla)
+    doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
 
 
 # ═══════════════════════ PDF ETIQUETAS 50x50mm ════════════════════════════
@@ -368,7 +467,6 @@ def generar_pdf_etiquetas(designs, cierre, ruta_salida):
         canv.drawCentredString(PW/2, qy-5.5*mm,  "experiencia en Google")
 
     canv.save()
-    print("  [PDF etiquetas] %s" % ruta_salida)
 
 
 # ═══════════════════════════ MAIN ═════════════════════════════════════════
@@ -402,7 +500,7 @@ def main():
     os.makedirs(carpeta_etiquetados, exist_ok=True)
 
     archivos = [f for f in sorted(os.listdir(carpeta)) if f.lower().endswith(IMG_EXT)]
-    print("\nProcesando %d archivo(s) en: %s\n" % (len(archivos), carpeta))
+    print("")
 
     designs, seen, no_reconocidos = [], set(), []
     for f in archivos:
@@ -418,51 +516,67 @@ def main():
         ruta_img = os.path.join(carpeta, f)
         p["_path"] = ruta_img
         p["img"]   = make_thumb_b64(ruta_img)
-        print("  [ok] %s  -  %s  -  %s%s" % (
-            p["codigo"], p["cliente"], p["medida"],
-            ("  (" + p["observacion"] + ")") if p["observacion"] else ""
-        ))
         designs.append(p)
 
     designs.sort(key=lambda d: d["codigoNum"] if isinstance(d["codigoNum"], int) else 9999)
 
     safe = re.sub(r"[^\w\-]+", "-", args.cierre)
 
-    # JSON (sin _path, va a etiquetados/)
-    paquete = {
-        "innova_etiquetado": 2,
-        "cierre": args.cierre,
-        "generado": datetime.datetime.now().isoformat(timespec="seconds"),
-        "designs": [{k: v for k, v in d.items() if k != "_path"} for d in designs],
-        "estados": {}
-    }
-    ruta_json = os.path.join(carpeta_etiquetados, "lista_etiquetado_%s.json" % safe)
-    with open(ruta_json, "w", encoding="utf-8") as fh:
-        json.dump(paquete, fh, ensure_ascii=False)
-    print("  [JSON]          %s" % ruta_json)
+    # -- costura: se cotiza antes de la tabla porque el total va en su resumen
+    modulo_costura = _cargar_costura()
+    cot = None
+    if modulo_costura:
+        try:
+            cot = modulo_costura.cotizar(carpeta)
+        except Exception as e:
+            print("[COSTURA] Error al cotizar: %s" % e)
+    resumen = armar_resumen(carpeta, cot)
 
-    # PDFs (van a etiquetados/)
-    if designs:
-        generar_pdf_tabla(designs, args.cierre,
-                          os.path.join(carpeta_etiquetados, "tabla_%s.pdf" % safe))
-        generar_pdf_etiquetas(designs, args.cierre,
-                              os.path.join(carpeta_etiquetados, "etiquetas_%s.pdf" % safe))
+    # -- etiquetado: JSON + PDFs (van a etiquetados/)
+    estado_etiquetado = "finalizado"
+    try:
+        paquete = {
+            "innova_etiquetado": 2,
+            "cierre": args.cierre,
+            "generado": datetime.datetime.now().isoformat(timespec="seconds"),
+            "designs": [{k: v for k, v in d.items() if k != "_path"} for d in designs],
+            "estados": {}
+        }
+        ruta_json = os.path.join(carpeta_etiquetados, "lista_etiquetado_%s.json" % safe)
+        with open(ruta_json, "w", encoding="utf-8") as fh:
+            json.dump(paquete, fh, ensure_ascii=False)
 
-    # -- generar lista de costura automáticamente ---------------------------
-    _intentar_costura(carpeta, args.cierre, sin_pausa)
+        if designs:
+            generar_pdf_tabla(designs, args.cierre,
+                              os.path.join(carpeta_etiquetados, "tabla_%s.pdf" % safe),
+                              resumen=resumen)
+            generar_pdf_etiquetas(designs, args.cierre,
+                                  os.path.join(carpeta_etiquetados, "etiquetas_%s.pdf" % safe))
+        else:
+            print("  [aviso] Ningun diseno reconocido: no se generan los PDF.")
+            estado_etiquetado = "error"
+    except Exception as e:
+        print("[ERROR] Etiquetado: %s" % e)
+        estado_etiquetado = "error"
 
+    # -- costura: PDF
+    estado_costura = "error"
+    if cot:
+        try:
+            if modulo_costura.generar_pdf_costura(carpeta, cierre=args.cierre,
+                                                  sin_pausa=sin_pausa, cot=cot):
+                estado_costura = "finalizado"
+        except Exception as e:
+            print("[COSTURA] Error al generar lista de costura: %s" % e)
+
+    # -- consola: estado de cada etapa + resumen de produccion
     print("\n" + "=" * 54)
-    print(" ETIQUETADO: %d diseno(s)" % len(designs))
-    if no_reconocidos:
-        print(" Sin reconocer: %d (revisar nombre)" % len(no_reconocidos))
-    print("")
-    print("  Carpeta: %s" % carpeta_etiquetados)
-    print("  JSON     -> lista_etiquetado_%s.json" % safe)
-    if designs:
-        print("  TABLA    -> tabla_%s.pdf" % safe)
-        print("  ETIQUETAS-> etiquetas_%s.pdf" % safe)
-    print("")
-    print(" Subi el .json a Google Drive para el dia del etiquetado.")
+    print(" ETIQUETADO: %s" % estado_etiquetado)
+    print(" COSTURA:    %s" % estado_costura)
+    print("-" * 54)
+    print(" RESUMEN DE PRODUCCION")
+    for etiqueta, valor in lineas_resumen(resumen):
+        print("  %-22s %s" % (etiqueta + ":", valor))
     print("=" * 54 + "\n")
 
     if not sin_pausa:

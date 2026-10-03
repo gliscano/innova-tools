@@ -12,23 +12,33 @@ LOGICA DE CORTE:
      b. Si solo un eje produce panos validos -> ese eje
      c. Si ambos ejes producen panos validos -> preferir vertical,
         salvo que desperdicie mas de 30cm extra vs horizontal
+  3. Si el nombre dice "horizontal" o "vertical" -> corta SIEMPRE en ese eje,
+     aunque el diseno entre sin corte. Si los panos no entran en el rollo,
+     lo marca como error (tratamiento manual).
 
-  Al finalizar, muestra el total de metros lineales de tela necesarios.
+  Al finalizar, muestra los metros lineales de tela necesarios, separados en
+  poliester y neoprene ("neoprene"/"neopreno" en el nombre).
 
 CODIGO DE IDENTIFICACION:
   Cada diseno recibe un codigo correlativo (COD001, COD002, ...) que se
   graba visualmente en la esquina superior derecha de la imagen de salida
-  (badge blanco semitransparente con texto negro) y se incluye al inicio
+  (badge blanco semitransparente con texto negro, de tamano fijo impreso:
+  ~4cm x 1cm a 0.5cm de los bordes, para que entre en el bolsillo de 5cm
+  sin importar el DPI del archivo) y se incluye al inicio
   del nombre del archivo.
-  En disenos cortados, solo el primer pano (IZQUIERDO o SUPERIOR) lleva
-  el badge; ambos panos llevan el codigo en el nombre del archivo.
-  El contador reinicia en COD001 en cada corrida del script.
+  En disenos cortados, solo un pano lleva el badge: el DERECHO en cortes
+  verticales, el SUPERIOR en horizontales; ambos panos llevan el codigo en
+  el nombre del archivo.
+  Los fondos de neoprene no llevan badge: el codigo va solo en el nombre.
+  El contador es persistente: el ultimo codigo usado se guarda en
+  ultimo_codigo.txt (junto al script) y al arrancar se propone el siguiente.
 
 ESTRUCTURA DE CARPETAS RESULTANTE:
   /Fondos semana/
     originales/     <- JPG/PNG originales sin modificar
     cortados/       <- panos procesados con codigo grabado
     etiquetados/    <- JSON + tabla.pdf + etiquetas.pdf (generados automaticamente)
+    costura/        <- costura_<cierre>.pdf (generado automaticamente)
 
 USO:
   python cortador_innova.py                          -> Usa la carpeta actual
@@ -73,6 +83,13 @@ MAX_PX_OPTIMIZE = 80_000_000   # Limite de pixeles para usar optimize=True al
                           # guardar JPG (ver _guardar). Por encima, libjpeg
                           # necesita GB de buffer extra y se queda sin memoria.
 EXTENSIONES = {'.jpg', '.jpeg', '.png'}
+
+# Badge del codigo: medidas IMPRESAS en cm, iguales en todos los fondos sin
+# importar su DPI. Tiene que caber en el bolsillo superior, que mide 5cm en los
+# fondos mas chicos (7.5cm en el resto): margen + largo = 4.5cm.
+BADGE_LETRA_CM = 0.8      # Tamano de la letra
+BADGE_LARGO_MAX_CM = 4.0  # Largo maximo del badge (vertical, ya rotado)
+BADGE_MARGEN_CM = 0.5     # Separacion del borde superior y del derecho
 # ------------------------------------------------------------------------------
 
 
@@ -117,12 +134,31 @@ def _colores_badge(modo):
     return (255, 255, 255), (20, 20, 20)
 
 
-def grabar_codigo(img_original, codigo_str, copiar=True):
+def _medir_texto(codigo_str, font, font_size):
+    """Devuelve (ancho, alto, offset_x, offset_y) del texto en pixeles."""
+    draw = ImageDraw.Draw(Image.new("L", (1, 1)))
+    # Compatible con Pillow 8+ y versiones anteriores
+    try:
+        bbox = draw.textbbox((0, 0), codigo_str, font=font)
+        return bbox[2] - bbox[0], bbox[3] - bbox[1], -bbox[0], -bbox[1]
+    except AttributeError:
+        try:
+            tw, th = draw.textsize(codigo_str, font=font)
+        except Exception:
+            tw = font_size * len(codigo_str) // 2
+            th = font_size
+        return tw, th, 0, 0
+
+
+def grabar_codigo(img_original, codigo_str, dpi, copiar=True):
     """
     Devuelve img_original con el badge del codigo grabado en la esquina superior
     derecha, rotado 90 grados en sentido antihorario.
     - Badge: pill blanco al 80% de opacidad.
-    - Fuente: tamano fijo (~0.95cm impreso a 150dpi).
+    - Tamano FIJO EN CM (BADGE_*), convertido a pixeles con el DPI del archivo:
+      mide lo mismo impreso en un fondo de 72dpi que en uno de 300dpi y entra
+      siempre en el bolsillo de 5cm. Si un codigo largo no entra en
+      BADGE_LARGO_MAX_CM, se achica la letra.
     - CONSERVA EL MODO DE COLOR: el badge se compone con mascaras en escala de
       grises, de modo que una imagen CMYK sigue siendo CMYK al salir. Cambiar
       esto por un convert() reintroduce el desvio de color en sublimacion.
@@ -137,30 +173,19 @@ def grabar_codigo(img_original, codigo_str, copiar=True):
         img = img.copy()
     w, h = img.size
 
-    # Fuente pequena: ~0.5% del lado menor, minimo 14px
-    font_size = 56   # ~0.95cm impreso a 150dpi
-    font = _cargar_fuente(font_size)
+    # Letra en cm -> px segun el DPI; se achica hasta que el pill (texto +
+    # relleno de medio cuerpo por lado) entre en el largo maximo.
+    largo_max_px = cm_a_px(BADGE_LARGO_MAX_CM, dpi)
+    font_size = max(8, cm_a_px(BADGE_LETRA_CM, dpi))
+    while True:
+        font = _cargar_fuente(font_size)
+        tw, th, txt_offset_x, txt_offset_y = _medir_texto(codigo_str, font, font_size)
+        pad_x = int(font_size * 0.5)
+        if tw + pad_x * 2 <= largo_max_px or font_size <= 8:
+            break
+        font_size = max(8, min(font_size - 1,
+                               int(font_size * largo_max_px / (tw + pad_x * 2))))
 
-    # Lienzo de medicion (solo para calcular el tamano del texto)
-    draw = ImageDraw.Draw(Image.new("L", (1, 1)))
-
-    # Medir el texto (compatible con Pillow 8+ y versiones anteriores)
-    try:
-        bbox = draw.textbbox((0, 0), codigo_str, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
-        txt_offset_x = -bbox[0]
-        txt_offset_y = -bbox[1]
-    except AttributeError:
-        try:
-            tw, th = draw.textsize(codigo_str, font=font)
-        except Exception:
-            tw = font_size * len(codigo_str) // 2
-            th = font_size
-        txt_offset_x = 0
-        txt_offset_y = 0
-
-    pad_x = int(font_size * 0.5)
     pad_y = int(font_size * 0.3)
     margin = int(font_size * 0.6)
 
@@ -193,9 +218,11 @@ def grabar_codigo(img_original, codigo_str, copiar=True):
     mask_pill = mask_pill.rotate(90, expand=True)
     mask_txt = mask_txt.rotate(90, expand=True)
 
-    # Pegar con margen de seguridad en ambos ejes (evita que la costura tape el badge)
-    MARGEN_COSTURA_PX = 50
-    pos = (w - mask_pill.width - MARGEN_COSTURA_PX, MARGEN_COSTURA_PX)
+    # Pegar con margen de seguridad en ambos ejes (evita que la costura tape el
+    # badge). La superficie de las mascaras tiene 'margin' px de aire alrededor
+    # del pill: se descuenta para que el margen impreso sea el del pill.
+    margen_px = cm_a_px(BADGE_MARGEN_CM, dpi)
+    pos = (w - mask_pill.width - margen_px + margin, margen_px - margin)
 
     color_pill, color_txt = _colores_badge(img.mode)
     img.paste(color_pill, pos, mask_pill)
@@ -307,6 +334,29 @@ def evaluar_corte(ancho_cm, alto_cm, ancho_rollo_cm, margen_cm):
     return entra_vert, desp_vert, entra_horiz, desp_horiz
 
 
+def corte_pedido(nombre):
+    """
+    Eje de corte pedido en el nombre del archivo: 'HORIZONTAL', 'VERTICAL',
+    'AMBOS' (dice las dos palabras, se ignora) o None (decide el cortador).
+    """
+    n = nombre.lower()
+    h = 'horizontal' in n
+    v = 'vertical' in n
+    if h and v:
+        return 'AMBOS'
+    if h:
+        return 'HORIZONTAL'
+    if v:
+        return 'VERTICAL'
+    return None
+
+
+def es_neoprene(nombre):
+    """Mismo criterio que detectar_especial() en generar_costura.py."""
+    n = nombre.lower()
+    return 'neoprene' in n or 'neopreno' in n
+
+
 def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
                     umbral_desp, calidad, codigo):
     """
@@ -346,6 +396,18 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
             f"     Reexportalo desde Photoshop/Illustrator con la resolucion incluida."
         )
 
+    # El nombre puede pedir el eje de corte ("horizontal"/"vertical") y marcar
+    # el fondo como neoprene, que no lleva el codigo grabado en la imagen.
+    pedido = corte_pedido(nombre)
+    if pedido == 'AMBOS':
+        aviso_dpi += (
+            "\n     [aviso] El nombre dice 'horizontal' y 'vertical': se ignora y"
+            "\n     se decide el corte automaticamente."
+        )
+        pedido = None
+    neoprene = es_neoprene(nombre)
+    aviso_badge = "  [sin codigo grabado: neoprene]" if neoprene else ""
+
     datos = {
         'codigo': codigo_str,
         'archivo_original': os.path.basename(ruta_archivo),
@@ -353,51 +415,76 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         'alto_cm': round(alto_cm, 1),
         'dpi': dpi,
         'dpi_del_metadato': dpi_del_metadato,
+        'tela': 'neoprene' if neoprene else 'poliester',
     }
 
-    # --- CASO: entra en el rollo sin corte ---
-    if ancho_cm <= ancho_rollo_cm or alto_cm <= ancho_rollo_cm:
+    # --- CASO: entra en el rollo sin corte (y el nombre no pide cortar) ---
+    if pedido is None and (ancho_cm <= ancho_rollo_cm or alto_cm <= ancho_rollo_cm):
         nombre_salida = f"{codigo_str} - {os.path.basename(ruta_archivo)}"
         ruta_destino = os.path.join(carpeta_salida, nombre_salida)
 
         # copiar=False: 'img' es nuestra y se cierra abajo. Evita duplicar en
         # RAM una imagen que en estos fondos pesa varios GB.
-        img_con_codigo = grabar_codigo(img, codigo_str, copiar=False)
+        if neoprene:
+            img_con_codigo = img
+        else:
+            img_con_codigo = grabar_codigo(img, codigo_str, dpi, copiar=False)
         _guardar(img_con_codigo, ruta_destino, ext, calidad, dpi_tuple, meta)
         img_con_codigo.close()
 
         lado_largo = max(ancho_cm, alto_cm)
-        datos.update({'panos': 1, 'corte': 'SIN CORTE', 'archivos': [nombre_salida]})
+        datos.update({'panos': 1, 'corte': 'SIN CORTE', 'archivos': [nombre_salida],
+                      'metros_lineales': round(lado_largo / 100, 2)})
+        guardado = "guardado sin codigo grabado (neoprene)" if neoprene else "guardado con codigo"
         return "SIN CORTE", (
             f"[SIN CORTE] {codigo_str} · {nombre}{ext}\n"
             f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
-            f"     Entra en el rollo de {ancho_rollo_cm}cm, guardado con codigo\n"
+            f"     Entra en el rollo de {ancho_rollo_cm}cm, {guardado}\n"
             f"     -> {nombre_salida}\n"
             f"     Metros lineales: {lado_largo / 100:.2f}m" + aviso_dpi
         ), [lado_largo], datos
 
-    # --- CASO: ambos lados superan el rollo ---
-    entra_vert, desp_vert, entra_horiz, desp_horiz = evaluar_corte(
-        ancho_cm, alto_cm, ancho_rollo_cm, margen_cm
-    )
-
-    if not entra_vert and not entra_horiz:
-        img.close()
-        datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': []})
-        return "ERROR", (
-            f"[ERROR] {nombre}{ext}\n"
-            f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
-            f"     Ningun corte produce panos que entren en el rollo de {ancho_rollo_cm}cm.\n"
-            f"     Este fondo necesita un tratamiento especial." + aviso_dpi
-        ), [], datos
-
-    # Decidir eje de corte
-    if entra_vert and entra_horiz:
-        cortar_horizontal = desp_vert - desp_horiz > umbral_desp
-    elif entra_horiz:
-        cortar_horizontal = True
+    if pedido:
+        # --- CASO: el nombre pide el eje; se corta asi aunque entre sin corte ---
+        cortar_horizontal = pedido == 'HORIZONTAL'
+        if cortar_horizontal:
+            entra = ancho_cm <= ancho_rollo_cm or alto_cm / 2 + margen_cm <= ancho_rollo_cm
+        else:
+            entra = alto_cm <= ancho_rollo_cm or ancho_cm / 2 + margen_cm <= ancho_rollo_cm
+        if not entra:
+            img.close()
+            datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': [], 'metros_lineales': 0})
+            return "ERROR", (
+                f"[ERROR] {nombre}{ext}\n"
+                f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
+                f"     El nombre pide corte {pedido} pero los panos no entran en el rollo de {ancho_rollo_cm}cm.\n"
+                f"     Este fondo necesita un tratamiento especial." + aviso_dpi
+            ), [], datos
     else:
-        cortar_horizontal = False
+        # --- CASO: ambos lados superan el rollo ---
+        entra_vert, desp_vert, entra_horiz, desp_horiz = evaluar_corte(
+            ancho_cm, alto_cm, ancho_rollo_cm, margen_cm
+        )
+
+        if not entra_vert and not entra_horiz:
+            img.close()
+            datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': [], 'metros_lineales': 0})
+            return "ERROR", (
+                f"[ERROR] {nombre}{ext}\n"
+                f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
+                f"     Ningun corte produce panos que entren en el rollo de {ancho_rollo_cm}cm.\n"
+                f"     Este fondo necesita un tratamiento especial." + aviso_dpi
+            ), [], datos
+
+        # Decidir eje de corte
+        if entra_vert and entra_horiz:
+            cortar_horizontal = desp_vert - desp_horiz > umbral_desp
+        elif entra_horiz:
+            cortar_horizontal = True
+        else:
+            cortar_horizontal = False
+
+    origen_corte = " (pedido en el nombre)" if pedido else ""
 
     if cortar_horizontal:
         tipo_corte = "HORIZONTAL (superior / inferior)"
@@ -439,17 +526,18 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
     ruta_1 = os.path.join(carpeta_salida, nombre_1)
     ruta_2 = os.path.join(carpeta_salida, nombre_2)
 
-    # Badge en SUPERIOR (corte horizontal) o DERECHO (corte vertical), siempre invertido
-    pano_badge = nombre_1 if cortar_horizontal else nombre_2
+    # Badge en SUPERIOR (corte horizontal) o DERECHO (corte vertical), siempre
+    # invertido. El neoprene no lleva badge en ningun pano.
+    pano_badge = None if neoprene else (nombre_1 if cortar_horizontal else nombre_2)
 
     # Un pano por vez: recortar, grabar, guardar y liberar antes de pasar al
     # siguiente. Tener los dos vivos a la vez duplica el pico de RAM, que en
     # estos fondos se mide en GB.
-    for caja, ruta, lleva_badge in ((caja_1, ruta_1, cortar_horizontal),
-                                    (caja_2, ruta_2, not cortar_horizontal)):
+    for caja, ruta, lleva_badge in ((caja_1, ruta_1, nombre_1 == pano_badge),
+                                    (caja_2, ruta_2, nombre_2 == pano_badge)):
         pano = img.crop(caja)
         if lleva_badge:
-            pano = grabar_codigo(pano, codigo_str, copiar=False)
+            pano = grabar_codigo(pano, codigo_str, dpi, copiar=False)
         _guardar(pano, ruta, ext, calidad, dpi_tuple, meta)
         pano.close()
         del pano
@@ -461,12 +549,13 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         'panos': 2,
         'corte': 'HORIZONTAL' if cortar_horizontal else 'VERTICAL',
         'archivos': [nombre_1, nombre_2],
+        'metros_lineales': round((largo_1 + largo_2) / 100, 2),
     })
 
     msg = (
-        f"[OK] {codigo_str} · {nombre}{ext}\n"
+        f"[OK] {codigo_str} · {nombre}{ext}{aviso_badge}\n"
         f"     Original: {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
-        f"     Corte: {tipo_corte}\n"
+        f"     Corte: {tipo_corte}{origen_corte}\n"
         f"     Margen de costura: {margen_cm}cm ({margen_px}px)\n"
         f"     -> {nombre_1}  ({medida_1}) | Lineal: {largo_1 / 100:.2f}m{'  [codigo grabado]' if nombre_1 == pano_badge else ''}\n"
         f"     -> {nombre_2}  ({medida_2}) | Lineal: {largo_2 / 100:.2f}m{'  [codigo grabado]' if nombre_2 == pano_badge else ''}"
@@ -667,6 +756,9 @@ def main():
     duracion = time.time() - inicio
     total_metros = sum(todos_los_metros) / 100
     total_panos  = len(todos_los_metros)
+    metros_neoprene = sum(d.get('metros_lineales', 0) for d in medidas_reales
+                          if d.get('tela') == 'neoprene')
+    metros_poliester = total_metros - metros_neoprene
 
     print("=" * 62)
     print("  RESUMEN CORTE")
@@ -678,6 +770,8 @@ def main():
     print(f"  Archivos en:   {carpeta_salida}")
     print("-" * 62)
     print(f"  Total panos:           {total_panos}")
+    print(f"  Tela poliester:        {metros_poliester:.2f}m")
+    print(f"  Tela neoprene:         {metros_neoprene:.2f}m")
     print(f"  METROS LINEALES:       {total_metros:.2f}m")
     print("=" * 62)
     print("")

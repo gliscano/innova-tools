@@ -688,7 +688,7 @@ function parseName(filename){
   const clean=s=>s.replace(/^[\s\-_–·.|]+|[\s\-_–·.|]+$/g,'').replace(/\s+/g,' ').trim();
   cliente=clean(cliente);
   cliente=cliente?titleCase(cliente):'(sin nombre)';
-  observacion=clean(observacion);
+  observacion=clean(observacion).replace(/_(izquierdo|derecho|superior|inferior)$/i,'');
   observacion=observacion.replace(/\b(izq|der|sup|inf|izquierd[oa]|derech[oa]|superior|inferior|pa[ñn]o\s*\d*)\b/gi,'');
   observacion=clean(observacion);
   if(/^x$/i.test(observacion))observacion='';

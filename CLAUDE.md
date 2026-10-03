@@ -21,7 +21,7 @@ The three scripts chain automatically; the operator only ever runs the first one
 ```
 cortador/cortador_innova.py            (CORTAR_FONDOS.bat)
   └─ subprocess → etiquetador/generar_lista_etiquetado.py  --cierre <hoy> --sin-pausa
-       └─ importlib → costura/generar_costura.py  generar_pdf_costura()
+       └─ importlib → costura/generar_costura.py  cotizar() then generar_pdf_costura()
 
 index.html                             (opened by hand on labeling day)
   └─ imports etiquetados/lista_etiquetado_<cierre>.json
@@ -30,10 +30,16 @@ index.html                             (opened by hand on labeling day)
 1. **cortador** — reads JPG/PNG from a folder, moves them into `originales/`,
    decides whether each design fits the 160cm fabric roll, splits it into two
    panels if not, burns a `CODnnn` badge into the image, writes to `cortados/`,
-   and reports total linear meters of fabric.
+   and reports linear meters of fabric split into polyester and neoprene.
 2. **etiquetador** — parses filenames in `cortados/`, writes `etiquetados/` with a
    JSON package (consumed by `index.html`), a printable A4 checklist PDF with
    thumbnails, and one 50x50mm label page per design for the WePrint DT01 printer.
+   It also owns the run's closing report: it calls costura's `cotizar()` *before*
+   building the checklist, because the "resumen de producción" (polyester m,
+   neoprene m, sublimation m = both, sewing total $) heads its first page and is the
+   last thing printed to the console, under one-word `finalizado`/`error` statuses
+   for ETIQUETADO and COSTURA. Per-design `[ok]` lines are intentionally gone;
+   `[omitido]`/`[aviso]`/`[ERROR]` lines stay.
 3. **costura** — from the same `cortados/` folder, prices the sewing work per
    design against a fixed tariff table and emits `costura/costura_<cierre>.pdf`.
 4. **index.html** — see *The labeling web app* below.
@@ -44,7 +50,8 @@ index.html                             (opened by hand on labeling day)
 /Fondos semana/
   originales/     originals, moved (not copied) out of the root
   cortados/       processed panels, "COD001 - <original name>.jpg"
-                  + medidas_reales.json (real cm per design, read by costura)
+                  + medidas_reales.json (real cm, panos, corte, tela,
+                    metros_lineales per design; read by costura and etiquetador)
   etiquetados/    lista_etiquetado_<cierre>.json, tabla_<cierre>.pdf, etiquetas_<cierre>.pdf
   costura/        costura_<cierre>.pdf
 ```
@@ -73,14 +80,21 @@ python costura/generar_costura.py "C:\ruta\cortados"
 ```
 
 `cortador` flags: `--margen` 0.45, `--ancho-rollo` 160, `--umbral` 30,
-`--calidad` 97, `--salida` (default: `cortados/` inside the input folder).
+`--calidad` 100, `--salida` (default: `cortados/` inside the input folder).
 The other two take only `--cierre` and `--sin-pausa`.
 
-Dependencies are `Pillow` and `reportlab`; the `.bat` files `pip install` them on
-demand. Both are already installed in this environment (Python 3.14).
+Dependencies are `Pillow` and `reportlab`. The system Python 3.14 here has Pillow
+but **not** reportlab — test the chained stages from a throwaway venv in the
+scratchpad rather than installing into the user's Python. `obtener_dpi` ignores DPI
+tags outside 50–1200, so synthetic test images need e.g. 60 DPI. The `.bat` launchers are inconsistent about installing
+them: `GENERAR_LISTA_ETIQUETADO.bat` installs both, `CORTAR_FONDOS.bat` installs only
+Pillow (so the chained etiquetador fails on a machine without reportlab), and
+`GENERAR_COSTURA.bat` installs nothing and takes no argument — it expects a
+`cortados/` folder next to itself.
 
-`Prueba imagenes/` holds sample backdrops (RGB and CMYK-FLUO) for manual testing —
-note the folder is doubly nested (`Prueba imagenes/Prueba imagenes/...`).
+There are no sample images in the repo. `Prueba imagenes/` (RGB and CMYK-FLUO test
+backdrops) is gitignored and lives outside the checkout when present; `*.jpg` is
+ignored globally anyway.
 
 ## Domain rules
 
@@ -94,10 +108,19 @@ printed and billed — confirm before touching.
 - **Cut axis**: when both axes yield panels that fit, prefer vertical (less visible
   seam) unless horizontal saves more than `UMBRAL_DESPERDICIO` = 30cm of fabric.
   When neither axis fits, the design is flagged as an error needing manual handling.
+- **Forced axis by filename**: "horizontal" or "vertical" in the name (`corte_pedido`)
+  skips the no-cut branch and *always* cuts on that axis, even if the design fits
+  the roll; if the forced panels do not fit, it is an ERROR. Both words → warning,
+  normal logic. This is an extra branch; the automatic logic above is unchanged.
+- **Neoprene** ("neoprene"/"neopreno", `es_neoprene`): no badge burned on any panel,
+  but the `CODnnn - ` filename prefix stays (every downstream stage keys on it).
+  Its meters count as neoprene fabric; everything else is polyester.
 - **Sewing tariffs** (`costura/generar_costura.py`, marked "Marzo 2026"): 2180 one
   panel / 4350 join <= 450cm (`UNION_THRESHOLD_CM`) / 6950 join > 450cm / 2350
   neoprene, plus 5000 fixed viáticos, total rounded up to the next 1000.
-  "neoprene"/"neopreno" and "funda" in a filename select special handling.
+  "neoprene"/"neopreno" in a filename selects the neoprene price. `detectar_especial`
+  also recognizes "funda", but a funda has no tariff of its own (confirmed by the
+  owner) and is priced like any other design — that is intended, not a gap.
 - **DPI**: read from image metadata. `obtener_dpi` returns `(dpi, del_metadato)`;
   when the tag is missing it falls back to 150 **and the caller must warn** — the
   designers' Photoshop/Illustrator exports always carry it, so an absent tag means
@@ -134,10 +157,11 @@ printed and billed — confirm before touching.
 - `Image.MAX_IMAGE_PIXELS = None` is set deliberately: large-format backdrops exceed
   Pillow's decompression-bomb limit.
 
-`costura` re-derives the cut decision itself from the filename measurements
-(`calcular_costura`), *without* the seam margin or the `UMBRAL_DESPERDICIO`
-heuristic — it just halves each side and prefers vertical. It can therefore disagree
-with what `cortador` actually did. Keep the two in sync by hand when changing either.
+`costura` prices from the cut `cortador` actually made — `panos`/`corte` in the
+manifest (`calcular_costura_real`); the join runs along `alto` for VERTICAL and
+`ancho` for HORIZONTAL. Only without a manifest does it fall back to re-deriving the
+cut from the filename (`calcular_costura`: no seam margin, no `UMBRAL_DESPERDICIO`,
+no forced axis), which can disagree with what `cortador` did.
 
 ## Filename contract
 
@@ -145,7 +169,9 @@ with what `cortador` actually did. Keep the two in sync by hand when changing ei
 Every consumer re-parses them with its own near-duplicate regexes (`COD_RE`,
 `MED_RE`): `etiquetador`, `costura`, and `index.html`. The Python `parse_name` in
 `etiquetador` is a line-by-line port of `parseName` in `index.html`; fix a parsing
-bug in one and check the other two.
+bug in one and check the other two. Both strip the cortador's `_IZQUIERDO`/
+`_DERECHO`/`_SUPERIOR`/`_INFERIOR` suffix from the observation separately
+(`PANO_RE`), because `_` is a word character and `SUF_RE`'s `` never matches it.
 
 ```
 COD001 - Cliente Nombre - 290x200 - Observacion.jpg
@@ -190,33 +216,40 @@ together, and bumping the version key.
 
 ## Gotchas
 
-- **`costura/` is gitignored** (the rule was meant for the generated output folder),
-  so `costura/generar_costura.py` and `costura/GENERAR_COSTURA.bat` are **untracked**
-  — edits there are invisible to `git status` and absent from a fresh clone. `*.json`
-  is ignored globally too. Use `git add -f` if these should be committed.
+- **`*.json` and `*.jpg` are gitignored globally**, so `medidas_reales.json`,
+  `lista_etiquetado_*.json` and any test image never show up in `git status`.
 - **The code counter is persistent**, stored in `cortador/ultimo_codigo.txt` next to
-  the script. `main()` prompts for a starting code (blank = last + 1). That file is
-  untracked and may not exist on a fresh checkout.
+  the script. `main()` prompts for a starting code (blank = last + 1). The file is
+  **tracked**, so every real run leaves it modified in the working tree — don't
+  commit a counter bump by accident.
 - **The badge lands on the second panel for vertical cuts** (`DERECHO`), on the first
-  for horizontal (`SUPERIOR`) — see the branch in `procesar_imagen`.
-- The badge is drawn rotated 90° counter-clockwise at a fixed 56px font (~0.95cm at
-  150dpi), inset 50px from the top-right corner to clear the seam.
-- **The prose docs are stale in three specific ways** — the module docstring of
-  `cortador_innova.py`, `cortador/README_INSTRUCCIONES.md` (and its `.html` twin,
-  both untracked) and `README.md` all still say the counter resets to COD001 each
-  run, that the badge scales with image size, and that the badge goes on
-  IZQUIERDO/SUPERIOR. The code is authoritative on all three. Update them together
-  or not at all.
+  for horizontal (`SUPERIOR`) — see `pano_badge` in `procesar_imagen`. Neoprene gets
+  none.
+- The badge is drawn rotated 90° counter-clockwise with a **fixed printed size in
+  cm** (`BADGE_LETRA_CM` 0.8, `BADGE_LARGO_MAX_CM` 4.0, `BADGE_MARGEN_CM` 0.5),
+  converted to px with the file's DPI — `grabar_codigo` takes `dpi`. It must fit in
+  the top pocket, which is 5cm on the smallest backdrops (7.5cm otherwise), so
+  margin + length stays <= 4.5cm; long codes shrink the font to fit. It used to be a
+  fixed 56px, which printed ~7.7cm long on a 72dpi file and overflowed the pocket.
+- **Docs are split by audience.** `README.md` is the technical reference;
+  `INSTRUCCIONES.md` is the single operator manual for the whole weekly flow
+  (Spanish, non-technical), and `INSTRUCCIONES.html` is a hand-maintained twin of it
+  — keep the two in sync. Behavior they describe (counter, badge placement, real
+  measurements, tariffs, flag defaults, console messages like `[omitido]`) also
+  appears in the module docstring of `cortador_innova.py`. When changing any of it,
+  update all of them together.
 - **`cortador` moves originals with `os.replace`** — it empties the input folder's
   root into `originales/`. Point it at a copy when experimenting.
-- **The two chaining lookups are asymmetric.** `cortador` finds the etiquetador
-  next to itself *or* at `../etiquetador/`, so it works both in this repo layout and
-  in the flattened folder handed to staff. `etiquetador` only looks at
-  `../costura/generar_costura.py` — in a flattened distribution folder the sewing PDF
-  is silently skipped (`_intentar_costura` also swallows every exception).
+- **Chaining lookups.** `cortador` finds the etiquetador next to itself *or* at
+  `../etiquetador/`; `_cargar_costura` in the etiquetador does the same for
+  `generar_costura.py`, so both the repo layout and the flattened folder handed to
+  staff work. Costura failures are caught and reported as `COSTURA: error`.
+- `generar_pdf_costura` no longer prints its console box; `imprimir_detalle` does,
+  and only in costura's own manual `main()`.
 - `etiquetador/generar_lista_etiquetado.py` is ~176KB because `LOGO_B64` and `QR_B64`
-  are inline base64 PNGs on two single lines (94: 63KB, 95: 98KB). Never `cat` it
-  whole; use `sed -n` on line ranges, and skip lines 94–95.
+  are inline base64 PNGs on two single lines (161: 63KB, 162: 98KB). Never `cat` it
+  whole; use `sed -n` on line ranges, and skip those two lines (find them with
+  `awk 'length($0)>10000{print NR}'` if they move again).
 - `costura/generar_costura.py` has its own empty `LOGO_B64 = ""` and prints no logo.
   Its comment asks for the blob to be pasted over from the etiquetador.
 - Both PDF generators define their own `CheckBox` flowable, brand palette, and page

@@ -2,6 +2,8 @@
 
 Suite de herramientas para automatizar el flujo de trabajo de fondos fotográficos sublimados sobre tela. Procesa imágenes JPG/PNG, las corta cuando superan el ancho del rollo, genera etiquetas de identificación y calcula los costos de costura.
 
+> **¿Sos operador?** El manual de uso paso a paso está en [INSTRUCCIONES.md](INSTRUCCIONES.md) (y en versión para navegador, `INSTRUCCIONES.html`). Este README es la referencia técnica.
+
 ---
 
 ## Funcionalidad
@@ -13,24 +15,26 @@ El flujo completo se ejecuta en cadena automáticamente al lanzar el cortador:
 - Determina si cada diseño entra en el rollo de tela (160 cm de ancho): entra si **al menos uno** de sus lados mide 160 cm o menos.
   - **Entra:** copia el archivo con el código grabado.
   - **No entra:** lo divide en dos paños con margen de costura incluido. Prefiere el corte vertical porque la costura se nota menos, salvo que el horizontal ahorre más de 30 cm de tela.
-- Asigna un código correlativo (`COD001`, `COD002`…) grabado como badge en la esquina superior derecha de la imagen. En los diseños cortados solo lo lleva un paño: el DERECHO en cortes verticales, el SUPERIOR en horizontales; ambos llevan el código en el nombre del archivo.
+  - **El nombre dice `horizontal` o `vertical`:** corta siempre en ese eje, aunque el diseño entre sin corte. Si los paños resultantes no entran en el rollo, lo marca como error.
+- Asigna un código correlativo (`COD001`, `COD002`…) grabado como badge en la esquina superior derecha de la imagen. En los diseños cortados solo lo lleva un paño: el DERECHO en cortes verticales, el SUPERIOR en horizontales; ambos llevan el código en el nombre del archivo. Los fondos de **neoprene** (`neoprene`/`neopreno` en el nombre) no llevan badge, solo el código en el nombre.
 - El contador **es persistente** entre corridas: guarda el último código en `cortador/ultimo_codigo.txt` y al arrancar propone continuar desde el siguiente (se puede sobrescribir en el prompt).
 - **No convierte espacios de color.** Preserva el modo y el perfil ICC de cada archivo: un CMYK sale CMYK con su perfil, un Adobe RGB sale en Adobe RGB. Nunca pasa nada a sRGB, que arruinaría la saturación al sublimar sobre poliéster. También conserva el EXIF, el XMP de Adobe y el bloque de Photoshop.
 - Exporta al **100% de calidad, sin submuestreo de color**. Los archivos pesan más que el original a cambio de fidelidad máxima.
 - Mide cada diseño desde los píxeles y el DPI, y escribe `cortados/medidas_reales.json`. Avisa si un archivo no declara su resolución, porque en ese caso las medidas no son confiables.
-- Muestra al final los metros lineales totales de tela necesarios.
+- Muestra al final los metros lineales de tela necesarios, separados en poliéster y neoprene. El manifiesto guarda por diseño `tela` y `metros_lineales`.
 - Mueve los originales a `originales/` y escribe los paños procesados en `cortados/`.
 
 ### 2. Etiquetador (`etiquetador/`)
 - Lee la carpeta `cortados/` y parsea el nombre de cada archivo para extraer código, cliente, medida y observación.
 - Genera en `etiquetados/`:
   - `lista_etiquetado_<cierre>.json` — para importar en la app de etiquetado (`index.html`).
-  - `tabla_<cierre>.pdf` — lista de chequeo imprimible con miniaturas.
+  - `tabla_<cierre>.pdf` — lista de chequeo imprimible con miniaturas, encabezada por el **resumen de producción**: tela poliéster, tela neoprene, sublimación (ambas) en metros, y total de costura.
   - `etiquetas_<cierre>.pdf` — páginas 50×50 mm listas para imprimir en la DT01 (WePrint).
+- Cierra la corrida en consola con el estado de etiquetado y costura (`finalizado` / `error`) y el mismo resumen de producción.
 
 ### 3. Costura (`costura/`)
 - Lee `cortados/` y calcula el tipo y costo de costura por diseño según sus dimensiones.
-- Toma la **medida real** desde `cortados/medidas_reales.json` (incluye los 15cm del bolsillo superior, que el nombre del cliente no trae); si ese archivo falta, avisa y recurre al nombre.
+- Toma la **medida real** y el **corte real** (paños y eje) desde `cortados/medidas_reales.json` (incluye los 15cm del bolsillo superior, que el nombre del cliente no trae); si ese archivo falta, avisa, recurre al nombre y deduce el corte por su cuenta.
 - Genera `costura/costura_<cierre>.pdf` con tabla de precios y total del lote.
 
 ### 4. App de etiquetado (`index.html`)
@@ -98,7 +102,7 @@ python costura/generar_costura.py "C:\ruta\fondos-semana\cortados" --cierre 2026
 | `--margen` | `0.45` | Margen de costura en cm |
 | `--ancho-rollo` | `160` | Ancho del rollo de tela en cm |
 | `--umbral` | `30` | Diferencia de desperdicio (cm) para preferir corte horizontal |
-| `--calidad` | `97` | Calidad de exportación JPG (1–100) |
+| `--calidad` | `100` | Calidad de exportación JPG (1–100) |
 | `--salida` | `cortados/` dentro de la carpeta de entrada | Carpeta de salida alternativa |
 
 El etiquetador y el generador de costura aceptan `--cierre` (default: fecha de hoy) y `--sin-pausa` (no espera Enter al final; lo usan las llamadas automáticas).

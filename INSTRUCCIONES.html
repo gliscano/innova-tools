@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INNOVA — Manual de uso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0f0e0c;
+  --paper: #f6f1e8;
+  --paper-2: #ede5d3;
+  --accent: #c2410c;
+  --accent-soft: #fed7aa;
+  --rule: #d6cdb8;
+  --muted: #6b6357;
+  --warn-bg: #fff4e0;
+  --warn-border: #c2410c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.65;
+  font-size: 16px;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+.grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  opacity: 0.04; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* === HEADER === */
+header {
+  border-bottom: 1px solid var(--rule);
+  padding: 32px 0 28px;
+  margin-bottom: 60px;
+  position: relative;
+}
+.header-inner {
+  max-width: 880px; margin: 0 auto; padding: 0 32px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.brand span { color: var(--accent); }
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* === LAYOUT === */
+.container { max-width: 880px; margin: 0 auto; padding: 0 32px 120px; }
+
+/* === HERO === */
+.hero { margin-bottom: 80px; }
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 14px;
+}
+.eyebrow::after {
+  content: ''; flex: 1; height: 1px; background: var(--rule);
+}
+h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(42px, 6vw, 76px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  margin-bottom: 24px;
+  font-variation-settings: "opsz" 144;
+}
+h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+.lead {
+  font-family: 'Fraunces', serif;
+  font-size: 21px;
+  line-height: 1.45;
+  font-weight: 300;
+  max-width: 640px;
+  color: var(--ink);
+  font-variation-settings: "opsz" 36;
+}
+
+/* === SECTIONS === */
+section { margin-bottom: 72px; }
+h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 36px;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  font-variation-settings: "opsz" 72;
+}
+.section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  display: block;
+  margin-bottom: 12px;
+}
+.section-rule {
+  height: 1px; background: var(--ink);
+  margin: 28px 0 32px; width: 100%;
+}
+h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  margin: 36px 0 14px;
+}
+p { margin-bottom: 16px; max-width: 680px; }
+p strong { font-weight: 600; }
+
+/* === LISTS === */
+ul, ol { margin: 0 0 20px 0; padding-left: 0; max-width: 680px; }
+ul li, ol li {
+  list-style: none;
+  position: relative;
+  padding: 10px 0 10px 44px;
+  border-bottom: 1px solid var(--rule);
+}
+ul li:last-child, ol li:last-child { border-bottom: none; }
+ol { counter-reset: step; }
+ol li::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero);
+  position: absolute; left: 0; top: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 500;
+}
+ul li::before {
+  content: ''; position: absolute;
+  left: 12px; top: 22px; width: 16px; height: 1px;
+  background: var(--accent);
+}
+
+/* === BADGE DEMO === */
+.badge-demo {
+  display: inline-flex; align-items: center; gap: 14px;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 16px 20px; margin: 20px 0;
+  max-width: 680px;
+}
+.badge-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 500;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid var(--rule);
+  padding: 6px 16px; border-radius: 20px;
+  color: var(--ink); white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+.badge-desc { font-size: 13.5px; color: var(--muted); }
+
+/* === WARNING === */
+.warning {
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn-border);
+  padding: 22px 26px;
+  margin: 28px 0;
+  max-width: 680px;
+  position: relative;
+}
+.warning::before {
+  content: 'ATENCIÓN';
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--warn-border);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 8px;
+}
+.warning p { margin: 0; }
+
+/* === CODE === */
+code, .code-block {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+code {
+  background: var(--paper-2);
+  padding: 2px 7px;
+  border-radius: 2px;
+  color: var(--accent);
+}
+.code-block {
+  display: block;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 18px 22px;
+  margin: 18px 0;
+  max-width: 680px;
+  border-left: 3px solid var(--accent);
+  overflow-x: auto;
+  line-height: 1.8;
+}
+
+/* === TABLE === */
+.logic-table {
+  width: 100%; max-width: 880px;
+  border-collapse: collapse;
+  margin: 28px 0;
+  font-size: 14px;
+}
+.logic-table th {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 14px 16px 14px 0;
+  border-bottom: 1px solid var(--ink);
+  vertical-align: bottom;
+}
+.logic-table td {
+  padding: 18px 16px 18px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.logic-table td:first-child { width: 42%; font-weight: 500; }
+.logic-table td:last-child { color: var(--muted); }
+
+/* === FAQ === */
+.faq details {
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 0;
+  max-width: 680px;
+}
+.faq summary {
+  cursor: pointer; list-style: none;
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+'; font-family: 'JetBrains Mono', monospace;
+  color: var(--accent); font-size: 22px; font-weight: 300;
+  transition: transform 0.2s;
+}
+.faq details[open] summary::after { content: '−'; }
+.faq details[open] { padding-bottom: 22px; }
+.faq summary + p { margin-top: 14px; color: var(--muted); }
+
+/* === FOOTER === */
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 36px 0;
+  margin-top: 80px;
+}
+.footer-inner {
+  max-width: 880px; margin: 0 auto; padding: 0 32px;
+  display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.footer-inner a { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 600px) {
+  .header-inner, .footer-inner { flex-direction: column; gap: 8px; }
+  .container { padding: 0 24px 80px; }
+  h1 { font-size: 44px; }
+  h2 { font-size: 28px; }
+  .logic-table { font-size: 13px; }
+  .logic-table td:first-child { width: 50%; }
+}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">INNOVA<span>·</span></div>
+    <div class="meta">Manual v3.0 · Fondos de la semana</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="hero">
+    <div class="eyebrow">Documentación interna</div>
+    <h1>De la carpeta<br>a la <em>tela</em></h1>
+    <p class="lead">Cómo pasar de la carpeta con los fondos de la semana a los paños listos para sublimar, las etiquetas impresas y el presupuesto de costura.</p>
+  </div>
+
+  <!-- § 01 -->
+  <section>
+    <span class="section-num">§ 01 — Introducción</span>
+    <h2>Qué hace el sistema</h2>
+    <div class="section-rule"></div>
+    <p>Con <strong>un solo doble clic</strong> en <code>CORTAR_FONDOS.bat</code> se hace todo el proceso de la semana, en cadena:</p>
+    <ol>
+      <li><strong>Cortador</strong> — toma los JPG y PNG de la carpeta, corta en dos los que no entran en el rollo de 1.60m, les graba un código de identificación y calcula los metros lineales de tela.</li>
+      <li><strong>Etiquetador</strong> — arma la lista para la app de etiquetado, la planilla de chequeo imprimible y las etiquetas de 50×50mm para la DT01.</li>
+      <li><strong>Costura</strong> — arma el PDF con el detalle y el costo de la costura para pasarle al taller.</li>
+    </ol>
+    <p>Las etapas 2 y 3 arrancan solas cuando termina la 1. No hay que ejecutar nada más.</p>
+    <p>Al terminar, dentro de la carpeta de la semana quedan cuatro subcarpetas:</p>
+    <code class="code-block">/Fondos semana/
+  originales/     &larr; los archivos originales, movidos acá sin modificar
+  cortados/       &larr; los paños listos para sublimar, con el código grabado
+                    + medidas_reales.json (las medidas medidas por el script)
+  etiquetados/    &larr; lista_etiquetado_&lt;fecha&gt;.json, tabla_&lt;fecha&gt;.pdf, etiquetas_&lt;fecha&gt;.pdf
+  costura/        &larr; costura_&lt;fecha&gt;.pdf</code>
+    <div class="warning">
+      <p>Los archivos originales <strong>se mueven</strong> (no se copian) a la subcarpeta <code>originales</code>. La carpeta que le pasás al script queda vacía de imágenes al terminar. Si querés conservarla tal cual, trabajá sobre una copia.</p>
+    </div>
+  </section>
+
+  <!-- § 02 -->
+  <section>
+    <span class="section-num">§ 02 — Instalación</span>
+    <h2>Solo la primera vez</h2>
+    <div class="section-rule"></div>
+
+    <h3>Paso 1 — Instalar Python</h3>
+    <p>Python es el programa que necesita la computadora para ejecutar los scripts. Es gratis y oficial.</p>
+    <ol>
+      <li>Abrir el navegador (Chrome, Edge, Firefox) e ir a <code>https://www.python.org/downloads/</code></li>
+      <li>Hacer clic en el botón amarillo grande que dice <strong>Download Python</strong> (la versión más reciente está bien).</li>
+      <li>Cuando termine de descargar, hacer doble clic en el archivo descargado (algo como <code>python-3.XX.X-amd64.exe</code>).</li>
+      <li><strong>MUY IMPORTANTE:</strong> en la primera pantalla del instalador, antes de hacer clic en <em>Install Now</em>, marcar la casilla <strong>Add python.exe to PATH</strong> (está abajo de todo). Si no se marca, nada va a funcionar.</li>
+      <li>Hacer clic en <strong>Install Now</strong> y esperar a que termine.</li>
+      <li>Cuando aparezca <em>Setup was successful</em>, cerrar el instalador.</li>
+      <li><strong>Reiniciar la computadora.</strong></li>
+    </ol>
+
+    <h3>Paso 2 — Instalar las librerías Pillow y ReportLab</h3>
+    <p>Pillow abre, corta y graba el código en las imágenes. ReportLab arma los PDF de etiquetado y de costura. Hacen falta las dos.</p>
+    <ol>
+      <li>Hacer clic en el botón de Inicio de Windows y escribir <code>cmd</code>.</li>
+      <li>Abrir <em>Símbolo del sistema</em> (se abre una ventana negra).</li>
+      <li>Escribir este comando y presionar ENTER:</li>
+    </ol>
+    <code class="code-block">pip install Pillow reportlab</code>
+    <p>Esperar el mensaje <em>Successfully installed...</em> y cerrar la ventana.</p>
+
+    <h3>Paso 3 — Guardar los archivos</h3>
+    <ol>
+      <li>Crear una carpeta en el escritorio llamada <strong>Cortador Innova</strong> (o donde sea más cómodo).</li>
+      <li>Copiar adentro las tres subcarpetas del sistema, <strong>sin cambiarles el nombre ni sacarlas de lugar</strong>: <code>cortador/</code> (con <code>cortador_innova.py</code> y <code>CORTAR_FONDOS.bat</code>), <code>etiquetador/</code> y <code>costura/</code>.</li>
+      <li>Copiar también <code>index.html</code> (la app de etiquetado).</li>
+    </ol>
+    <p>El cortador busca a los otros dos scripts en esas carpetas para llamarlos solo al terminar. Si <code>costura/</code> no está al lado de <code>etiquetador/</code>, el PDF de costura no se genera: solo aparece un aviso de una línea, fácil de pasar por alto, y el resto del proceso sigue igual.</p>
+    <p>Listo: la instalación no hay que repetirla.</p>
+  </section>
+
+  <!-- § 03 -->
+  <section>
+    <span class="section-num">§ 03 — Uso semanal</span>
+    <h2>Cortar, etiquetar, coser</h2>
+    <div class="section-rule"></div>
+
+    <h3>1. Cortar los fondos</h3>
+    <ol>
+      <li>Poner todos los fondos de la semana (JPG y/o PNG) en una carpeta.</li>
+      <li>Hacer <strong>doble clic</strong> en <code>CORTAR_FONDOS.bat</code>.</li>
+      <li>Se abre una ventana negra que pide la carpeta. <strong>Arrastrar la carpeta con los fondos hasta la ventana</strong> y presionar <strong>ENTER</strong>.</li>
+      <li>La ventana muestra el último código usado y pregunta desde cuál arrancar (<code>Iniciar desde [COD043]:</code>). <strong>Presionar ENTER sin escribir nada</strong> para seguir la numeración de la semana pasada. Solo escribir un número para forzar otro arranque (por ejemplo, repetir una corrida que salió mal).</li>
+      <li>Esperar a que termine. Muestra qué hizo con cada archivo y después genera solo el etiquetado y la costura.</li>
+      <li>Al final la ventana muestra si el etiquetado y la costura terminaron bien, y el <strong>resumen de producción</strong>:
+        <code class="code-block"> ETIQUETADO: finalizado
+ COSTURA:    finalizado
+------------------------------------------------------
+ RESUMEN DE PRODUCCION
+  Tela poliéster:        25.82 m
+  Tela neoprene:         9.00 m
+  Sublimación (total):   34.82 m
+  Total costura:         $ 32.000</code>
+        Los metros de cada tela son los que hay que descontar del stock; sublimación es la suma de las dos. El mismo resumen sale impreso arriba de todo en <code>etiquetados/tabla_&lt;fecha&gt;.pdf</code>.</li>
+      <li>Revisar si hubo avisos en la ventana (ver § 04). Si una etapa dice <strong>error</strong>, el motivo aparece en una línea <code>[ERROR]</code> o <code>[aviso]</code> más arriba.</li>
+    </ol>
+    <p>Los archivos para mandar al plotter están en <code>cortados</code>.</p>
+
+    <h3>Palabras clave en el nombre del archivo</h3>
+    <p>Antes de cortar, se puede escribir en el nombre del fondo:</p>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Si el nombre dice</th><th>Qué hace el cortador</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>horizontal</code></td><td>Corta <strong>siempre</strong> en SUPERIOR / INFERIOR, aunque el diseño entre en el rollo sin cortar</td></tr>
+        <tr><td><code>vertical</code></td><td>Corta <strong>siempre</strong> en IZQUIERDO / DERECHO, aunque el diseño entre en el rollo sin cortar</td></tr>
+        <tr><td><code>neoprene</code> o <code>neopreno</code></td><td><strong>No graba el código</strong> en la imagen (el nombre del archivo sí lo lleva) y cuenta sus metros como tela neoprene</td></tr>
+      </tbody>
+    </table>
+    <p>Si el corte pedido produce paños que no entran en el rollo, el diseño se marca como <strong>error</strong>. Si el nombre dice <code>horizontal</code> y <code>vertical</code> a la vez, se avisa y el cortador decide solo.</p>
+
+    <h3>2. Etiquetar</h3>
+    <ol>
+      <li>Subir <code>etiquetados/lista_etiquetado_&lt;fecha&gt;.json</code> a <strong>Google Drive</strong>.</li>
+      <li>El día del etiquetado, abrir <code>index.html</code> en el navegador y usar el botón <strong>Importar lista</strong> con ese archivo. Cada diseño aparece con su miniatura, su código y su cliente.</li>
+      <li>Imprimir <code>etiquetados/etiquetas_&lt;fecha&gt;.pdf</code> en la DT01. En el diálogo de impresión elegir <strong>tamaño real (100%)</strong>, sin <em>ajustar a la página</em>, o las etiquetas salen escaladas.</li>
+      <li>Ir tildando en la app lo que ya se imprimió. Si una etiqueta sale mal, la app la reimprime sola sin volver a generar el PDF completo.</li>
+    </ol>
+    <p><code>etiquetados/tabla_&lt;fecha&gt;.pdf</code> es la misma lista en papel, con miniaturas y un casillero para tildar a mano sobre la mesa de trabajo.</p>
+    <p>Cada etiqueta de 50×50mm lleva, de arriba hacia abajo: el logo de INNOVA, una línea punteada de corte, el <strong>nombre del cliente</strong> (la letra se achica sola si el nombre es largo), la leyenda <em>¡Gracias por elegirnos!</em>, el código QR de reseñas y el pie <em>Tu opinión cuenta. Contanos tu experiencia en Google</em>.</p>
+
+    <h3>3. Mandar a costura</h3>
+    <ol>
+      <li>Abrir <code>costura/costura_&lt;fecha&gt;.pdf</code>.</li>
+      <li>Revisar si hay <strong>filas pintadas de amarillo y sin monto</strong>: son diseños que necesitan más de dos paños. Se listan también al pie bajo <em>ATENCIÓN</em>. Hay que cotizarlos a mano antes de mandar el presupuesto.</li>
+      <li>Mandar el PDF al taller. La columna <em>Check</em> es para tildar a medida que el taller entrega cada fondo.</li>
+    </ol>
+  </section>
+
+  <!-- § 04 -->
+  <section>
+    <span class="section-num">§ 04 — Avisos</span>
+    <h2>Avisos a los que prestar atención</h2>
+    <div class="section-rule"></div>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Aviso en la ventana</th><th>Qué significa y qué hacer</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>[AVISO] El archivo no declara densidad</code></td><td>El archivo no trae su resolución; el script asume 150 DPI y <strong>las medidas quedan mal</strong> (un archivo de 254 DPI leído como 150 mide un 69% de más). Photoshop e Illustrator siempre la incluyen, así que el archivo pasó por otra herramienta. Reexportarlo y volver a cortar.</td></tr>
+        <tr><td>Un diseño marcado como <strong>[ERROR]</strong></td><td>Ningún corte en dos paños entra en el rollo. Tratamiento manual.</td></tr>
+        <tr><td><code>[omitido] sin codigo/medida</code> (etiquetado)</td><td>Del nombre del archivo no se pudo sacar el código o la medida; el diseño <strong>no aparece</strong> en la lista ni en las etiquetas. Corregir el nombre en <code>cortados</code> y regenerar el etiquetado (§ 06).</td></tr>
+        <tr><td><code>[omitido] sin medida</code> (costura)</td><td>El diseño <strong>no aparece</strong> en el presupuesto ni suma al total. Corregir el nombre y regenerar la costura.</td></tr>
+        <tr><td><code>[COSTURA] generar_costura.py no encontrado</code></td><td><code>generar_costura.py</code> no está ni al lado del etiquetador ni en una carpeta <code>costura/</code> vecina. La costura sale <strong>error</strong> y el resumen sin total. Revisar el Paso 3 de la instalación.</td></tr>
+        <tr><td><code>[aviso] No hay medidas_reales.json</code></td><td>El resumen sale con los metros en «sin datos» (pasa al rehacer el etiquetado sobre una carpeta sin ese archivo). Volver a cortar si se necesitan los metros.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- § 05 -->
+  <section>
+    <span class="section-num">§ 05 — Por dentro</span>
+    <h2>Cómo funciona</h2>
+    <div class="section-rule"></div>
+
+    <h3>Cómo se decide el corte</h3>
+    <p>El rollo de tela mide <strong>1.60m de ancho × 10m de largo</strong>. Los paños se apilan en columna para sublimar por calandrado.</p>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Caso</th><th>Qué hace el cortador</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>El nombre dice <code>horizontal</code> o <code>vertical</code></td><td>Corta en ese eje, siempre; si los paños no entran en el rollo, marca error</td></tr>
+        <tr><td>Al menos un lado del diseño ≤ 1.60m</td><td>No corta — guarda con el código grabado</td></tr>
+        <tr><td>Ambos lados &gt; 1.60m, los dos cortes son posibles</td><td>Corte vertical (costura menos visible), salvo que el horizontal ahorre más de 30cm de tela</td></tr>
+        <tr><td>Solo un eje de corte produce paños que entran en el rollo</td><td>Usa ese eje</td></tr>
+        <tr><td>Ningún corte produce paños que entren</td><td>Marca error (tratamiento manual)</td></tr>
+      </tbody>
+    </table>
+    <p>Los metros lineales de cada paño son su lado más largo. Se suman por tipo de tela: neoprene si el nombre dice <code>neoprene</code>/<code>neopreno</code>, poliéster todo lo demás.</p>
+    <p>El <strong>solape de costura es de 0.45cm a cada lado del corte</strong> (0.90cm en total): la máquina de coser consume esa parte y el diseño queda continuo al unir los paños.</p>
+
+    <h3>El código de identificación</h3>
+    <p>Cada diseño recibe un código correlativo (<code>COD001</code>, <code>COD002</code>…) que se graba de dos formas.</p>
+    <p><strong>En la imagen</strong> — un badge con texto negro sobre fondo blanco semitransparente en la <strong>esquina superior derecha</strong>, girado 90°. Tiene un <strong>tamaño fijo impreso</strong>, igual en todos los fondos sin importar su resolución: unos <strong>4cm de largo y 1cm de ancho</strong>, a 0.5cm del borde superior y del derecho. Así ocupa como máximo 4.5cm desde arriba y <strong>entra siempre en el bolsillo</strong>, también en el de 5cm.</p>
+    <div class="badge-demo">
+      <span class="badge-pill">COD001</span>
+      <span class="badge-desc">Así se ve el badge sobre la imagen, en la esquina superior derecha</span>
+    </div>
+    <p><strong>En el nombre del archivo</strong> — todos los archivos de <code>cortados</code> empiezan con el código:</p>
+    <code class="code-block">COD001 - Flor Gonzalez - 290x200 - Con ojales.jpg
+COD002 - Maria Soledad - 500x290_IZQUIERDO.jpg
+COD002 - Maria Soledad - 500x290_DERECHO.jpg</code>
+    <p>Del nombre se sacan los cuatro datos de la etiqueta: código, cliente, medida y observación (la última es opcional).</p>
+    <p>En los diseños cortados en dos paños, <strong>uno solo lleva el badge</strong>: el <strong>DERECHO</strong> si el corte fue vertical, el <strong>SUPERIOR</strong> si fue horizontal — siempre del lado contrario a la costura. Los dos llevan el código en el nombre, y en la lista de etiquetado y en el presupuesto el diseño aparece <strong>una sola vez</strong>.</p>
+    <p>Los fondos de <strong>neoprene no llevan badge</strong> en ningún paño: el código queda solo en el nombre del archivo.</p>
+    <p>El contador <strong>no reinicia</strong>: se guarda en <code>cortador/ultimo_codigo.txt</code> y cada corrida propone seguir desde el siguiente, así los códigos no se repiten entre semanas.</p>
+
+    <h3>Las medidas reales</h3>
+    <p>El cortador mide cada diseño desde los píxeles del archivo y guarda esas medidas en <code>cortados/medidas_reales.json</code>. Nuestros fondos llevan unos <strong>15cm extra arriba para el bolsillo</strong> del soporte, y el nombre que manda el cliente no los incluye: un archivo llamado <code>200x200</code> mide en realidad 200×215.</p>
+    <p>Por eso hay dos medidas en juego, y cada documento usa la que le corresponde:</p>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Documento</th><th>Medida que muestra</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Etiquetas, planilla y app de etiquetado</td><td>La del nombre del archivo, la que pidió el cliente</td></tr>
+        <tr><td>Presupuesto de costura</td><td>La real, con el bolsillo — es la tela que se cose, se descuenta y se cobra</td></tr>
+      </tbody>
+    </table>
+    <p>Si el <code>medidas_reales.json</code> falta, la costura avisa y usa la medida del nombre.</p>
+
+    <h3>Fidelidad de color</h3>
+    <p>El cortador <strong>no convierte espacios de color</strong>. Corta y nada más:</p>
+    <ul>
+      <li>Un archivo <strong>CMYK</strong> sale CMYK, con su mismo perfil (por ejemplo <em>Japan Web Coated</em>).</li>
+      <li>Un archivo <strong>Adobe RGB (1998)</strong> sale en Adobe RGB.</li>
+      <li>Nunca convierte nada a <strong>sRGB</strong>, que arruinaría la saturación al sublimar sobre poliéster.</li>
+    </ul>
+    <p>Se conservan <strong>todos los metadatos</strong> de cada archivo: el perfil ICC, el EXIF, el XMP de Adobe y el bloque de Photoshop. Los dos paños de un diseño cortado quedan con el perfil del original.</p>
+    <p>El código grabado también respeta el color: en los CMYK las letras van <strong>solo con el canal negro (K)</strong>, no con negro de registro, que en sublimación sería tinta al 300%.</p>
+    <p>La única diferencia contra el original es la mínima pérdida de volver a comprimir un JPG. El cortador guarda al <strong>100% de calidad y sin submuestreo de color</strong>: el error medido es de 0.05 sobre 255. A cambio, los archivos cortados pesan bastante más que el original. Los PNG no pierden nada.</p>
+
+    <h3>Tipos de costura y tarifas</h3>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Caso</th><th>Detalle en el PDF · Monto</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Al menos un lado ≤ 160cm (entra en el rollo)</td><td>1 Paño · $ 2.180</td></tr>
+        <tr><td>Ambos lados &gt; 160cm, unión de hasta 450cm</td><td>Unión hasta 4,5 m · $ 4.350</td></tr>
+        <tr><td>Ambos lados &gt; 160cm, unión de más de 450cm</td><td>Unión de 4,5 m en adelante · $ 6.950</td></tr>
+        <tr><td>El nombre del archivo dice «neoprene» o «neopreno»</td><td>Piso Neoprene (no importa la medida) · $ 2.350</td></tr>
+        <tr><td>Ningún corte al medio entra en el rollo</td><td>Múltiples paños (cotizar manual) · sin monto</td></tr>
+        <tr><td>Viáticos</td><td>Una vez por cierre, fila aparte · $ 5.000</td></tr>
+      </tbody>
+    </table>
+    <p>Tarifas vigentes a <strong>marzo 2026</strong>. El total se <strong>redondea para arriba al próximo múltiplo de $1.000</strong>; el subtotal sin redondear aparece en letra chica debajo de la tabla para poder controlar la cuenta.</p>
+    <p>El presupuesto cotiza con el corte que <strong>hizo de verdad el cortador</strong> (lo lee de <code>medidas_reales.json</code>): un diseño cortado por pedido del nombre se cobra como unión aunque entrara en el rollo, y la unión se mide a lo largo del lado que el corte no parte. Si el <code>medidas_reales.json</code> falta, decide el corte por su cuenta desde el nombre, y en ese caso puede no coincidir con los archivos de <code>cortados</code>.</p>
+    <p><strong>Para actualizar los precios</strong>, abrir <code>costura/generar_costura.py</code> con el Bloc de notas y cambiar los números del bloque <code>tarifas (Marzo 2026)</code>, cerca del principio:</p>
+    <code class="code-block">PRECIO_1_PANO       = 2_180
+PRECIO_UNION_CORTA  = 4_350
+PRECIO_UNION_LARGA  = 6_950
+PRECIO_NEOPRENE     = 2_350
+VIATICOS            = 5_000</code>
+    <p>Los guiones bajos son separadores de miles (<code>2_180</code> es dos mil ciento ochenta). Actualizar también el mes del comentario.</p>
+  </section>
+
+  <!-- § 06 -->
+  <section>
+    <span class="section-num">§ 06 — Rehacer</span>
+    <h2>Rehacer una etapa por separado</h2>
+    <div class="section-rule"></div>
+    <p>Normalmente no hace falta. Sirve cuando se corrigió el nombre de un archivo en <code>cortados</code>, se agregó un fondo que faltaba, cambiaron las tarifas o se quiere otra fecha de cierre.</p>
+    <p>Las dos etapas leen la carpeta <code>cortados</code> y dejan su resultado <strong>al lado</strong> de ella, no adentro: si le pasás <code>/Fondos semana/cortados</code>, los archivos van a <code>/Fondos semana/etiquetados</code> y <code>/Fondos semana/costura</code>. Si se regenera con la misma fecha, se pisan los archivos anteriores.</p>
+
+    <h3>Etiquetado</h3>
+    <p>Hacer doble clic en <code>etiquetador/GENERAR_LISTA_ETIQUETADO.bat</code> y arrastrar la carpeta <code>cortados</code> a la ventana (o soltar la carpeta directamente encima del <code>.bat</code>). Instala Pillow y ReportLab si faltan.</p>
+    <p>Al terminar, el etiquetador <strong>también regenera la costura</strong>.</p>
+
+    <h3>Costura</h3>
+    <p>Lo más simple es por terminal (abrir <code>cmd</code>):</p>
+    <code class="code-block">python "C:\Cortador Innova\costura\generar_costura.py" "C:\ruta\Fondos semana\cortados"</code>
+    <div class="warning">
+      <p><code>GENERAR_COSTURA.bat</code> solo funciona si hay una carpeta <code>cortados</code> <strong>al lado del propio .bat</strong>: no se le puede arrastrar una carpeta. Para usarlo con doble clic hay que copiar <code>generar_costura.py</code> y el <code>.bat</code> dentro de la carpeta de la semana.</p>
+    </div>
+
+    <h3>Opciones por terminal</h3>
+    <code class="code-block">python cortador_innova.py "C:\Fondos" --margen 0.50 --ancho-rollo 155
+python generar_lista_etiquetado.py "C:\Fondos\cortados" --cierre 2026-05-30
+python generar_costura.py "C:\Fondos\cortados" --cierre 2026-05-30</code>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Opción · script · default</th><th>Para qué</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>--margen</code> · cortador · 0.45</td><td>Solape de costura en cm por lado</td></tr>
+        <tr><td><code>--ancho-rollo</code> · cortador · 160</td><td>Ancho del rollo en cm</td></tr>
+        <tr><td><code>--umbral</code> · cortador · 30</td><td>Ahorro de tela (cm) a partir del cual se prefiere el corte horizontal</td></tr>
+        <tr><td><code>--calidad</code> · cortador · 100</td><td>Calidad JPG de salida (1–100)</td></tr>
+        <tr><td><code>--salida</code> · cortador · <code>cortados/</code></td><td>Otra carpeta de salida</td></tr>
+        <tr><td><code>--cierre</code> · etiquetador, costura · hoy</td><td>Identificador del lote; va en el nombre de los archivos</td></tr>
+        <tr><td><code>--sin-pausa</code> · etiquetador, costura</td><td>No espera ENTER al terminar (lo usan las llamadas automáticas)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- § 07 -->
+  <section class="faq">
+    <span class="section-num">§ 07 — Preguntas frecuentes</span>
+    <h2>FAQ</h2>
+    <div class="section-rule"></div>
+
+    <details>
+      <summary>¿Qué pasa con los archivos originales?</summary>
+      <p>No se modifican, pero <strong>se mueven</strong> a la subcarpeta <code>originales</code>. Conviene apuntar el script a una carpeta de trabajo y no a un archivo maestro de diseños.</p>
+    </details>
+    <details>
+      <summary>¿Soporta JPG y PNG? ¿Y otros archivos?</summary>
+      <p>Procesa <code>.jpg</code>, <code>.jpeg</code> y <code>.png</code> (los PNG conservan su transparencia). Los demás archivos (PDF, PSD, etc.) los ignora.</p>
+    </details>
+    <details>
+      <summary>¿El script cambia los colores del diseño?</summary>
+      <p>No. Un CMYK sale CMYK y un Adobe RGB sale Adobe RGB, cada uno con su perfil original. Nunca pasa nada a sRGB.</p>
+    </details>
+    <details>
+      <summary>¿Los códigos arrancan de nuevo en COD001 cada semana?</summary>
+      <p>No. El script recuerda el último código y propone seguir desde el siguiente. Para forzar otro número, escribirlo cuando lo pregunta al principio.</p>
+    </details>
+    <details>
+      <summary>¿Por qué uno de los dos paños cortados no tiene el badge?</summary>
+      <p>Con grabarlo una vez alcanza. Lo lleva el DERECHO en los cortes verticales y el SUPERIOR en los horizontales; el otro paño tiene el código en el nombre del archivo.</p>
+    </details>
+    <details>
+      <summary>Un diseño cortado en dos, ¿sale dos veces en la lista o en las etiquetas?</summary>
+      <p>No. Los dos paños comparten el código: una etiqueta por diseño, no por paño.</p>
+    </details>
+    <details>
+      <summary>¿Por qué la medida del presupuesto no coincide con la de la etiqueta?</summary>
+      <p>Porque el presupuesto usa la medida real, con los 15cm del bolsillo. Un fondo <code>200x200</code> figura en costura como <code>200 x 215 cm</code>. Ver <em>Las medidas reales</em> en § 05.</p>
+    </details>
+    <details>
+      <summary>¿Puedo cargar la carpeta cortados en la app en vez del .json?</summary>
+      <p>Sí, <code>index.html</code> también acepta la carpeta de imágenes y lee el código del nombre de cada archivo. El <code>.json</code> es más cómodo porque ya trae las miniaturas.</p>
+    </details>
+    <details>
+      <summary>¿Los viáticos se cobran por fondo?</summary>
+      <p>No, una sola vez por cierre.</p>
+    </details>
+    <details>
+      <summary>¿Por qué el PDF de costura no tiene el logo de INNOVA?</summary>
+      <p>El script todavía no lo dibuja. El PDF sale bien igual, con el encabezado de texto.</p>
+    </details>
+    <details>
+      <summary>Me aparece el error «python no se reconoce como comando»</summary>
+      <p>Al instalar Python no se marcó <strong>Add python.exe to PATH</strong>. Desinstalarlo desde Panel de Control → Programas y volver a instalarlo marcando esa casilla.</p>
+    </details>
+    <details>
+      <summary>Me dice que falta Pillow o ReportLab</summary>
+      <p>Abrir <code>cmd</code> y correr <code>pip install Pillow reportlab</code>.</p>
+    </details>
+  </section>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div>© INNOVA · Fondos fotográficos</div>
+    <div><a href="https://innova54.com/">innova54.com</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
