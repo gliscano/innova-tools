@@ -147,7 +147,7 @@ SUF_RE = re.compile(
     r"\b(izq|der|sup|inf|izquierd[oa]|derech[oa]|superior|inferior|pa[\u00f1n]o\s*\d*)\b",
     re.IGNORECASE
 )
-PANO_RE = re.compile(r"_(izquierdo|derecho|superior|inferior)$", re.IGNORECASE)
+PANO_RE = re.compile(r"(?:^|_)(izquierdo|derecho|superior|inferior|medio\d*|centro\d*)$", re.IGNORECASE)
 
 # ── colores marca ─────────────────────────────────────────────────────────
 ACCENT = colors.HexColor("#c2410c")
@@ -427,44 +427,60 @@ def generar_pdf_etiquetas(designs, cierre, ruta_salida):
         if i > 0:
             canv.showPage()
         nombre = d["cliente"]
+        # Mismo codigo que el cortador graba en la imagen (badge "COD001")
+        cod_num = d.get("codigoNum")
+        codigo_img = ("COD%03d" % cod_num) if isinstance(cod_num, int) else ""
 
+        def Y(top_mm):
+            """Coordenada desde el borde SUPERIOR (en mm) -> y de ReportLab."""
+            return PH - top_mm * mm
+
+        # Todo el contenido queda entre 2mm y 46mm desde arriba: 50x50mm justos.
         # logo
-        lw = 34*mm; lh = lw * LOGO_RATIO
+        lw = 30*mm; lh = lw * LOGO_RATIO
         if logo_rdr:
-            canv.drawImage(logo_rdr, (PW-lw)/2, PH-2.4*mm-lh,
+            canv.drawImage(logo_rdr, (PW-lw)/2, Y(2.0)-lh,
                            width=lw, height=lh, preserveAspectRatio=True)
+        top = 2.0 + lh/mm
 
         # separador punteado
-        dot_y = PH - 2.4*mm - lh - 1.8*mm
+        dot_t = top + 1.4
         canv.setStrokeColor(colors.black)
         canv.setLineWidth(0.4)
         canv.setDash(0.7, 0.9)
-        canv.line(6*mm, dot_y, 44*mm, dot_y)
+        canv.line(7*mm, Y(dot_t), 43*mm, Y(dot_t))
         canv.setDash()
 
         # nombre cliente
         canv.setFillColor(colors.black)
-        name_y = dot_y - 4.8*mm
-        pt = fit_text(canv, nombre, 43*mm, start_pt=11, min_pt=7)
+        name_t = dot_t + 4.0
+        canv.setFont("Helvetica", 9.5)
+        pt = fit_text(canv, nombre, 42*mm, start_pt=9.5, min_pt=6)
         canv.setFont("Helvetica", pt)
-        canv.drawCentredString(PW/2, name_y, nombre)
+        canv.drawCentredString(PW/2, Y(name_t), nombre)
+
+        # codigo grabado en la imagen
+        cod_t = name_t + 3.6
+        if codigo_img:
+            canv.setFont("Helvetica-Bold", 8)
+            canv.drawCentredString(PW/2, Y(cod_t), codigo_img)
 
         # gracias
-        gracias_y = name_y - 4.4*mm
-        canv.setFont("Helvetica", 9.5)
-        canv.drawCentredString(PW/2, gracias_y, "\u00a1Gracias por elegirnos!")
+        gracias_t = cod_t + 3.5
+        canv.setFont("Helvetica", 7.5)
+        canv.drawCentredString(PW/2, Y(gracias_t), "\u00a1Gracias por elegirnos!")
 
         # QR
-        q = 20.5*mm
-        qx = (PW - q) / 2
-        qy = gracias_y - 1.6*mm - q
+        q = 17*mm
+        qr_t = gracias_t + 1.3
         if qr_rdr:
-            canv.drawImage(qr_rdr, qx, qy, width=q, height=q)
+            canv.drawImage(qr_rdr, (PW - q) / 2, Y(qr_t) - q, width=q, height=q)
 
         # pie
-        canv.setFont("Helvetica", 6.6)
-        canv.drawCentredString(PW/2, qy-2.8*mm,  "Tu opini\u00f3n cuenta. Contanos tu")
-        canv.drawCentredString(PW/2, qy-5.5*mm,  "experiencia en Google")
+        pie_t = qr_t + q/mm + 2.4
+        canv.setFont("Helvetica", 6)
+        canv.drawCentredString(PW/2, Y(pie_t),       "Tu opini\u00f3n cuenta. Contanos tu")
+        canv.drawCentredString(PW/2, Y(pie_t + 2.4), "experiencia en Google")
 
     canv.save()
 

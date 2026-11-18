@@ -33,7 +33,7 @@ if errorlevel 1 (
     echo.
 )
 
-echo Arrastra la carpeta con los JPG a esta ventana y presiona ENTER,
+echo Arrastra la carpeta con los JPG/PNG a esta ventana y presiona ENTER,
 echo o presiona ENTER directamente para usar la carpeta donde esta este archivo:
 echo.
 set /p CARPETA="Carpeta: "

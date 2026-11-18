@@ -325,7 +325,7 @@ footer {
     <div class="section-rule"></div>
     <p>Con <strong>un solo doble clic</strong> en <code>CORTAR_FONDOS.bat</code> se hace todo el proceso de la semana, en cadena:</p>
     <ol>
-      <li><strong>Cortador</strong> — toma los JPG y PNG de la carpeta, corta en dos los que no entran en el rollo de 1.60m, les graba un código de identificación y calcula los metros lineales de tela.</li>
+      <li><strong>Cortador</strong> — toma los JPG y PNG de la carpeta, corta en dos (o en más paños, si hace falta) los que no entran en el rollo de 1.60m, les graba un código de identificación y calcula los metros lineales de tela.</li>
       <li><strong>Etiquetador</strong> — arma la lista para la app de etiquetado, la planilla de chequeo imprimible y las etiquetas de 50×50mm para la DT01.</li>
       <li><strong>Costura</strong> — arma el PDF con el detalle y el costo de la costura para pasarle al taller.</li>
     </ol>
@@ -415,11 +415,11 @@ footer {
       </thead>
       <tbody>
         <tr><td><code>horizontal</code></td><td>Corta <strong>siempre</strong> en SUPERIOR / INFERIOR, aunque el diseño entre en el rollo sin cortar</td></tr>
-        <tr><td><code>vertical</code></td><td>Corta <strong>siempre</strong> en IZQUIERDO / DERECHO, aunque el diseño entre en el rollo sin cortar</td></tr>
+        <tr><td><code>vertical</code></td><td>Corta <strong>siempre</strong> en IZQUIERDO / DERECHO, aunque el diseño entre en el rollo sin cortar. En los fondos grandes que van en 3 o más paños, es la única forma de que se corten en vertical</td></tr>
         <tr><td><code>neoprene</code> o <code>neopreno</code></td><td><strong>No graba el código</strong> en la imagen (el nombre del archivo sí lo lleva) y cuenta sus metros como tela neoprene</td></tr>
       </tbody>
     </table>
-    <p>Si el corte pedido produce paños que no entran en el rollo, el diseño se marca como <strong>error</strong>. Si el nombre dice <code>horizontal</code> y <code>vertical</code> a la vez, se avisa y el cortador decide solo.</p>
+    <p>Si con el corte pedido dos paños no entran en el rollo, el diseño se divide en <strong>3 o más paños iguales</strong> en ese mismo eje. Si el nombre dice <code>horizontal</code> y <code>vertical</code> a la vez, se avisa y el cortador decide solo.</p>
 
     <h3>2. Etiquetar</h3>
     <ol>
@@ -429,12 +429,12 @@ footer {
       <li>Ir tildando en la app lo que ya se imprimió. Si una etiqueta sale mal, la app la reimprime sola sin volver a generar el PDF completo.</li>
     </ol>
     <p><code>etiquetados/tabla_&lt;fecha&gt;.pdf</code> es la misma lista en papel, con miniaturas y un casillero para tildar a mano sobre la mesa de trabajo.</p>
-    <p>Cada etiqueta de 50×50mm lleva, de arriba hacia abajo: el logo de INNOVA, una línea punteada de corte, el <strong>nombre del cliente</strong> (la letra se achica sola si el nombre es largo), la leyenda <em>¡Gracias por elegirnos!</em>, el código QR de reseñas y el pie <em>Tu opinión cuenta. Contanos tu experiencia en Google</em>.</p>
+    <p>Cada etiqueta de 50×50mm lleva, de arriba hacia abajo: el logo de INNOVA, una línea punteada de corte, el <strong>nombre del cliente</strong> (la letra se achica sola si el nombre es largo), el <strong>código grabado en la imagen</strong> (por ejemplo <code>COD042</code>, en negrita, para encontrar el fondo sin abrir el archivo), la leyenda <em>¡Gracias por elegirnos!</em>, el código QR de reseñas y el pie <em>Tu opinión cuenta. Contanos tu experiencia en Google</em>.</p>
 
     <h3>3. Mandar a costura</h3>
     <ol>
       <li>Abrir <code>costura/costura_&lt;fecha&gt;.pdf</code>.</li>
-      <li>Revisar si hay <strong>filas pintadas de amarillo y sin monto</strong>: son diseños que necesitan más de dos paños. Se listan también al pie bajo <em>ATENCIÓN</em>. Hay que cotizarlos a mano antes de mandar el presupuesto.</li>
+      <li>Revisar si hay <strong>filas pintadas de amarillo y sin monto</strong>: son diseños que no se pudieron cotizar solos (casi no pasa: solo si falta <code>medidas_reales.json</code> y la medida del nombre no permite deducir el corte). Se listan también al pie bajo <em>ATENCIÓN</em>. Hay que cotizarlos a mano antes de mandar el presupuesto.</li>
       <li>Mandar el PDF al taller. La columna <em>Check</em> es para tildar a medida que el taller entrega cada fondo.</li>
     </ol>
   </section>
@@ -450,7 +450,12 @@ footer {
       </thead>
       <tbody>
         <tr><td><code>[AVISO] El archivo no declara densidad</code></td><td>El archivo no trae su resolución; el script asume 150 DPI y <strong>las medidas quedan mal</strong> (un archivo de 254 DPI leído como 150 mide un 69% de más). Photoshop e Illustrator siempre la incluyen, así que el archivo pasó por otra herramienta. Reexportarlo y volver a cortar.</td></tr>
-        <tr><td>Un diseño marcado como <strong>[ERROR]</strong></td><td>Ningún corte en dos paños entra en el rollo. Tratamiento manual.</td></tr>
+        <tr><td>Un diseño marcado como <strong>[ERROR]</strong></td><td>El fondo no se pudo cortar (por ejemplo, un margen de costura más grande que el rollo). Tratamiento manual.</td></tr>
+        <tr><td><code>[aviso] Calidad: resolucion baja</code></td><td>El archivo tiene menos de 72 DPI: se va a ver poco definido impreso en grande. Pedir al cliente o al diseñador un archivo de mayor resolución.</td></tr>
+        <tr><td><code>[aviso] Calidad: posible imagen BORROSA o ampliada</code></td><td>La imagen tiene dibujo pero no tiene detalle fino: está desenfocada o fue agrandada (por ejemplo, de 1m a 3m). Abrir el archivo al 100% y mirarlo; si se ve blando, pedir uno mejor.</td></tr>
+        <tr><td><code>[aviso] Calidad: posible imagen PIXELADA</code></td><td>Se ven bloques de píxeles repetidos: fue agrandada sin suavizar. Pedir un archivo original.</td></tr>
+        <tr><td><code>[AVISO] Revisar calidad: COD003, …</code> (al final)</td><td>Resumen de todos los fondos con alguno de los tres avisos de arriba. Revisarlos antes de mandar al plotter.</td></tr>
+        <tr><td><code>[aviso] Hay paños de 12.00m: superan el largo del rollo</code></td><td>Un paño es más largo que el rollo de 10m. Confirmar que hay rollo suficiente antes de imprimir.</td></tr>
         <tr><td><code>[omitido] sin codigo/medida</code> (etiquetado)</td><td>Del nombre del archivo no se pudo sacar el código o la medida; el diseño <strong>no aparece</strong> en la lista ni en las etiquetas. Corregir el nombre en <code>cortados</code> y regenerar el etiquetado (§ 06).</td></tr>
         <tr><td><code>[omitido] sin medida</code> (costura)</td><td>El diseño <strong>no aparece</strong> en el presupuesto ni suma al total. Corregir el nombre y regenerar la costura.</td></tr>
         <tr><td><code>[COSTURA] generar_costura.py no encontrado</code></td><td><code>generar_costura.py</code> no está ni al lado del etiquetador ni en una carpeta <code>costura/</code> vecina. La costura sale <strong>error</strong> y el resumen sin total. Revisar el Paso 3 de la instalación.</td></tr>
@@ -472,19 +477,31 @@ footer {
         <tr><th>Caso</th><th>Qué hace el cortador</th></tr>
       </thead>
       <tbody>
-        <tr><td>El nombre dice <code>horizontal</code> o <code>vertical</code></td><td>Corta en ese eje, siempre; si los paños no entran en el rollo, marca error</td></tr>
+        <tr><td>El nombre dice <code>horizontal</code> o <code>vertical</code></td><td>Corta en ese eje, siempre; si dos paños no entran en el rollo, lo divide en 3 o más paños iguales en ese eje</td></tr>
         <tr><td>Al menos un lado del diseño ≤ 1.60m</td><td>No corta — guarda con el código grabado</td></tr>
         <tr><td>Ambos lados &gt; 1.60m, los dos cortes son posibles</td><td>Corte vertical (costura menos visible), salvo que el horizontal ahorre más de 30cm de tela</td></tr>
         <tr><td>Solo un eje de corte produce paños que entran en el rollo</td><td>Usa ese eje</td></tr>
-        <tr><td>Ningún corte produce paños que entren</td><td>Marca error (tratamiento manual)</td></tr>
+        <tr><td>No entra en dos paños (fondos grandes, más de ~3m de alto y de ancho)</td><td><strong>Corte horizontal en 3 o más paños iguales</strong> que no superan 1.60m; solo es vertical si el nombre dice <code>vertical</code></td></tr>
       </tbody>
     </table>
+    <p>Ejemplos de fondos grandes (con el solape de costura incluido):</p>
+    <table class="logic-table">
+      <thead>
+        <tr><th>Fondo</th><th>Resultado</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>5m de ancho × 4m de alto</td><td>3 paños de 5m × 1.34m (SUPERIOR, MEDIO1, INFERIOR)</td></tr>
+        <tr><td>12m de ancho × 5m de alto</td><td>4 paños de 12m × 1.26m (SUPERIOR, MEDIO1, MEDIO2, INFERIOR)</td></tr>
+        <tr><td>5m × 4m con <code>vertical</code> en el nombre</td><td>4 paños de 1.26m × 4m (IZQUIERDO, CENTRO1, CENTRO2, DERECHO)</td></tr>
+      </tbody>
+    </table>
+    <p>Si algún paño queda más largo que el rollo (10m), el cortador avisa pero corta igual.</p>
     <p>Los metros lineales de cada paño son su lado más largo. Se suman por tipo de tela: neoprene si el nombre dice <code>neoprene</code>/<code>neopreno</code>, poliéster todo lo demás.</p>
-    <p>El <strong>solape de costura es de 0.45cm a cada lado del corte</strong> (0.90cm en total): la máquina de coser consume esa parte y el diseño queda continuo al unir los paños.</p>
+    <p>El <strong>solape de costura es de 0.45cm a cada lado del corte</strong> (0.90cm en total; los paños del medio lo llevan arriba y abajo): la máquina de coser consume esa parte y el diseño queda continuo al unir los paños.</p>
 
     <h3>El código de identificación</h3>
     <p>Cada diseño recibe un código correlativo (<code>COD001</code>, <code>COD002</code>…) que se graba de dos formas.</p>
-    <p><strong>En la imagen</strong> — un badge con texto negro sobre fondo blanco semitransparente en la <strong>esquina superior derecha</strong>, girado 90°. Tiene un <strong>tamaño fijo impreso</strong>, igual en todos los fondos sin importar su resolución: unos <strong>4cm de largo y 1cm de ancho</strong>, a 0.5cm del borde superior y del derecho. Así ocupa como máximo 4.5cm desde arriba y <strong>entra siempre en el bolsillo</strong>, también en el de 5cm.</p>
+    <p><strong>En la imagen</strong> — un badge con texto negro sobre fondo blanco semitransparente en la <strong>esquina superior derecha</strong>, girado 90°. Tiene un <strong>tamaño fijo impreso</strong>, igual en todos los fondos sin importar su resolución: unos <strong>3.8cm de largo y 1cm de ancho</strong>, a <strong>0.5cm del borde superior</strong> y a <strong>2.5cm del borde derecho</strong> (así no se pierde en el dobladillo del lateral al coser). Ocupa como máximo 4.3cm desde arriba y <strong>entra siempre en el bolsillo</strong>, también en el de 5cm.</p>
     <div class="badge-demo">
       <span class="badge-pill">COD001</span>
       <span class="badge-desc">Así se ve el badge sobre la imagen, en la esquina superior derecha</span>
@@ -492,9 +509,12 @@ footer {
     <p><strong>En el nombre del archivo</strong> — todos los archivos de <code>cortados</code> empiezan con el código:</p>
     <code class="code-block">COD001 - Flor Gonzalez - 290x200 - Con ojales.jpg
 COD002 - Maria Soledad - 500x290_IZQUIERDO.jpg
-COD002 - Maria Soledad - 500x290_DERECHO.jpg</code>
+COD002 - Maria Soledad - 500x290_DERECHO.jpg
+COD003 - Juan Perez - 500x400_SUPERIOR.jpg
+COD003 - Juan Perez - 500x400_MEDIO1.jpg
+COD003 - Juan Perez - 500x400_INFERIOR.jpg</code>
     <p>Del nombre se sacan los cuatro datos de la etiqueta: código, cliente, medida y observación (la última es opcional).</p>
-    <p>En los diseños cortados en dos paños, <strong>uno solo lleva el badge</strong>: el <strong>DERECHO</strong> si el corte fue vertical, el <strong>SUPERIOR</strong> si fue horizontal — siempre del lado contrario a la costura. Los dos llevan el código en el nombre, y en la lista de etiquetado y en el presupuesto el diseño aparece <strong>una sola vez</strong>.</p>
+    <p>En los diseños cortados, <strong>un solo paño lleva el badge</strong>: el <strong>DERECHO</strong> si el corte fue vertical, el <strong>SUPERIOR</strong> si fue horizontal (también en los de 3 o más paños). Todos llevan el código en el nombre, y en la lista de etiquetado y en el presupuesto el diseño aparece <strong>una sola vez</strong>.</p>
     <p>Los fondos de <strong>neoprene no llevan badge</strong> en ningún paño: el código queda solo en el nombre del archivo.</p>
     <p>El contador <strong>no reinicia</strong>: se guarda en <code>cortador/ultimo_codigo.txt</code> y cada corrida propone seguir desde el siguiente, así los códigos no se repiten entre semanas.</p>
 
@@ -530,21 +550,22 @@ COD002 - Maria Soledad - 500x290_DERECHO.jpg</code>
       </thead>
       <tbody>
         <tr><td>Al menos un lado ≤ 160cm (entra en el rollo)</td><td>1 Paño · $ 2.180</td></tr>
-        <tr><td>Ambos lados &gt; 160cm, unión de hasta 450cm</td><td>Unión hasta 4,5 m · $ 4.350</td></tr>
-        <tr><td>Ambos lados &gt; 160cm, unión de más de 450cm</td><td>Unión de 4,5 m en adelante · $ 6.950</td></tr>
+        <tr><td>Cortado en 2 paños, unión de hasta 450cm (inclusive)</td><td>Unión hasta 4,5 m · $ 4.350</td></tr>
+        <tr><td>Cortado en 2 paños, unión de más de 450cm</td><td>Unión de más de 4,5 m · $ 6.950</td></tr>
+        <tr><td>Cortado en 3 o más paños</td><td>N uniones: una tarifa de unión por cada costura (3 paños = 2 uniones), según el largo de la unión</td></tr>
         <tr><td>El nombre del archivo dice «neoprene» o «neopreno»</td><td>Piso Neoprene (no importa la medida) · $ 2.350</td></tr>
-        <tr><td>Ningún corte al medio entra en el rollo</td><td>Múltiples paños (cotizar manual) · sin monto</td></tr>
-        <tr><td>Viáticos</td><td>Una vez por cierre, fila aparte · $ 5.000</td></tr>
+        <tr><td>Viáticos</td><td>Una vez por cierre, fila aparte · $ 6.000</td></tr>
       </tbody>
     </table>
-    <p>Tarifas vigentes a <strong>marzo 2026</strong>. El total se <strong>redondea para arriba al próximo múltiplo de $1.000</strong>; el subtotal sin redondear aparece en letra chica debajo de la tabla para poder controlar la cuenta.</p>
+    <p>Ejemplo: un fondo de 5m × 4m sale en 3 paños horizontales; cada unión mide 5m (más de 4,5m), así que se cobra 2 × $ 6.950 = $ 13.900.</p>
+    <p>Tarifas vigentes a <strong>marzo 2026</strong> (+15% sobre el último trimestre de 2025). El total se <strong>redondea para arriba al próximo múltiplo de $1.000</strong>; el subtotal sin redondear aparece en letra chica debajo de la tabla para poder controlar la cuenta.</p>
     <p>El presupuesto cotiza con el corte que <strong>hizo de verdad el cortador</strong> (lo lee de <code>medidas_reales.json</code>): un diseño cortado por pedido del nombre se cobra como unión aunque entrara en el rollo, y la unión se mide a lo largo del lado que el corte no parte. Si el <code>medidas_reales.json</code> falta, decide el corte por su cuenta desde el nombre, y en ese caso puede no coincidir con los archivos de <code>cortados</code>.</p>
     <p><strong>Para actualizar los precios</strong>, abrir <code>costura/generar_costura.py</code> con el Bloc de notas y cambiar los números del bloque <code>tarifas (Marzo 2026)</code>, cerca del principio:</p>
     <code class="code-block">PRECIO_1_PANO       = 2_180
 PRECIO_UNION_CORTA  = 4_350
 PRECIO_UNION_LARGA  = 6_950
 PRECIO_NEOPRENE     = 2_350
-VIATICOS            = 5_000</code>
+VIATICOS            = 6_000</code>
     <p>Los guiones bajos son separadores de miles (<code>2_180</code> es dos mil ciento ochenta). Actualizar también el mes del comentario.</p>
   </section>
 
@@ -599,7 +620,7 @@ python generar_costura.py "C:\Fondos\cortados" --cierre 2026-05-30</code>
     </details>
     <details>
       <summary>¿Soporta JPG y PNG? ¿Y otros archivos?</summary>
-      <p>Procesa <code>.jpg</code>, <code>.jpeg</code> y <code>.png</code> (los PNG conservan su transparencia). Los demás archivos (PDF, PSD, etc.) los ignora.</p>
+      <p>Procesa <code>.jpg</code>, <code>.jpeg</code> y <code>.png</code>. Los PNG conservan su transparencia y su modo (color, escala de grises, 16 bits). Los demás archivos (PDF, PSD, etc.) los ignora.</p>
     </details>
     <details>
       <summary>¿El script cambia los colores del diseño?</summary>
@@ -610,12 +631,16 @@ python generar_costura.py "C:\Fondos\cortados" --cierre 2026-05-30</code>
       <p>No. El script recuerda el último código y propone seguir desde el siguiente. Para forzar otro número, escribirlo cuando lo pregunta al principio.</p>
     </details>
     <details>
-      <summary>¿Por qué uno de los dos paños cortados no tiene el badge?</summary>
-      <p>Con grabarlo una vez alcanza. Lo lleva el DERECHO en los cortes verticales y el SUPERIOR en los horizontales; el otro paño tiene el código en el nombre del archivo.</p>
+      <summary>¿Por qué solo uno de los paños cortados tiene el badge?</summary>
+      <p>Con grabarlo una vez alcanza. Lo lleva el DERECHO en los cortes verticales y el SUPERIOR en los horizontales; los demás paños tienen el código en el nombre del archivo.</p>
     </details>
     <details>
-      <summary>Un diseño cortado en dos, ¿sale dos veces en la lista o en las etiquetas?</summary>
-      <p>No. Los dos paños comparten el código: una etiqueta por diseño, no por paño.</p>
+      <summary>Un diseño cortado en varios paños, ¿sale varias veces en la lista o en las etiquetas?</summary>
+      <p>No. Todos los paños comparten el código: una etiqueta por diseño, no por paño.</p>
+    </details>
+    <details>
+      <summary>¿Qué tan confiable es el aviso de calidad?</summary>
+      <p>Es orientativo. Se calibró con fotos reales: no marcó ninguna foto original, detecta siempre las imágenes pixeladas y la mayoría de las agrandadas al doble o más o desenfocadas. Una ampliación chica (por ejemplo ×1.5) puede pasar sin aviso, y un diseño muy suave puede dar un aviso de más. Ante la duda, mirar el archivo al 100%. El aviso nunca frena el corte.</p>
     </details>
     <details>
       <summary>¿Por qué la medida del presupuesto no coincide con la de la etiqueta?</summary>

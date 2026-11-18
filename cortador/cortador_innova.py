@@ -12,9 +12,14 @@ LOGICA DE CORTE:
      b. Si solo un eje produce panos validos -> ese eje
      c. Si ambos ejes producen panos validos -> preferir vertical,
         salvo que desperdicie mas de 30cm extra vs horizontal
+     d. Si ningun corte en 2 panos entra -> 3 o mas panos IGUALES, siempre
+        en HORIZONTAL (cada pano <= 160cm con el margen incluido). Ej: 500x400
+        -> 3 panos de 500 x ~134cm; 1200x500 -> 4 panos de 1200 x ~126cm.
+        Sufijos: _SUPERIOR, _MEDIO1.., _INFERIOR.
   3. Si el nombre dice "horizontal" o "vertical" -> corta SIEMPRE en ese eje,
-     aunque el diseno entre sin corte. Si los panos no entran en el rollo,
-     lo marca como error (tratamiento manual).
+     aunque el diseno entre sin corte. Si 2 panos no entran en el rollo, lo
+     divide en 3 o mas panos iguales en ese eje (vertical: _IZQUIERDO,
+     _CENTRO1.., _DERECHO).
 
   Al finalizar, muestra los metros lineales de tela necesarios, separados en
   poliester y neoprene ("neoprene"/"neopreno" en el nombre).
@@ -23,15 +28,20 @@ CODIGO DE IDENTIFICACION:
   Cada diseno recibe un codigo correlativo (COD001, COD002, ...) que se
   graba visualmente en la esquina superior derecha de la imagen de salida
   (badge blanco semitransparente con texto negro, de tamano fijo impreso:
-  ~4cm x 1cm a 0.5cm de los bordes, para que entre en el bolsillo de 5cm
-  sin importar el DPI del archivo) y se incluye al inicio
-  del nombre del archivo.
+  ~3.8cm x 1cm, a 0.5cm del borde superior para que entre en el bolsillo de
+  5cm y a 2.5cm del lateral para que no se pierda en la costura, sin importar
+  el DPI del archivo) y se incluye al inicio del nombre del archivo.
   En disenos cortados, solo un pano lleva el badge: el DERECHO en cortes
-  verticales, el SUPERIOR en horizontales; ambos panos llevan el codigo en
-  el nombre del archivo.
+  verticales, el SUPERIOR en horizontales; todos los panos llevan el codigo
+  en el nombre del archivo.
   Los fondos de neoprene no llevan badge: el codigo va solo en el nombre.
   El contador es persistente: el ultimo codigo usado se guarda en
   ultimo_codigo.txt (junto al script) y al arrancar se propone el siguiente.
+
+CALIDAD:
+  Avisa (sin frenar el corte) si la imagen tiene menos de 72 DPI, si parece
+  borrosa o ampliada, o si parece pixelada. Es una heuristica: ver
+  evaluar_calidad().
 
 ESTRUCTURA DE CARPETAS RESULTANTE:
   /Fondos semana/
@@ -51,6 +61,7 @@ REQUISITOS:
 
 import os
 import sys
+import math
 import time
 import json
 import shutil
@@ -61,7 +72,7 @@ import argparse
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageStat, ImageChops
     Image.MAX_IMAGE_PIXELS = None
 except ImportError:
     print("")
@@ -87,9 +98,24 @@ EXTENSIONES = {'.jpg', '.jpeg', '.png'}
 # Badge del codigo: medidas IMPRESAS en cm, iguales en todos los fondos sin
 # importar su DPI. Tiene que caber en el bolsillo superior, que mide 5cm en los
 # fondos mas chicos (7.5cm en el resto): margen + largo = 4.5cm.
-BADGE_LETRA_CM = 0.8      # Tamano de la letra
-BADGE_LARGO_MAX_CM = 4.0  # Largo maximo del badge (vertical, ya rotado)
-BADGE_MARGEN_CM = 0.5     # Separacion del borde superior y del derecho
+BADGE_LETRA_CM = 0.76     # Tamano de la letra
+BADGE_LARGO_MAX_CM = 3.8  # Largo maximo del badge (vertical, ya rotado)
+BADGE_MARGEN_CM = 0.5     # Separacion del borde superior
+BADGE_MARGEN_LATERAL_CM = 2.5  # Separacion del borde derecho: el lateral se
+                          # dobla al coser y un badge mas pegado se perdia.
+
+# Corte en 3 o mas panos (fondos que no entran en 2 panos)
+LARGO_ROLLO_CM = 1000     # Largo del rollo: un pano mas largo genera un aviso
+
+# Deteccion de baja calidad (heuristica, solo avisa; ver evaluar_calidad)
+CALIDAD_DPI_MIN = 72          # Por debajo, resolucion baja para impresion
+CALIDAD_MUESTRA_PX = 512      # Lado de cada zona analizada (pixeles nativos)
+CALIDAD_ZONAS = 5             # Por lado: se analizan ZONAS x ZONAS recortes
+CALIDAD_NITIDEZ_MIN = 0.47    # Detalle fino / detalle a escala 1/2. Calibrado con
+                              # fotos reales: originales 0.49-1.0, ampliadas 2x
+                              # o mas y desenfocadas 0.36-0.6.
+CALIDAD_PIXELADO_MAX = 3.0    # Periodicidad de bloques. Originales 1.0-1.6 (aun
+                              # en JPG calidad 60), ampliadas "vecino" 3.3 o mas.
 # ------------------------------------------------------------------------------
 
 
@@ -129,7 +155,13 @@ def _colores_badge(modo):
         return (0, 0, 0, 0), (0, 0, 0, 235)
     if modo == 'RGBA':
         return (255, 255, 255, 255), (20, 20, 20, 255)
-    if modo in ('L', 'I', 'F'):
+    if modo == 'LA':
+        return (255, 255), (20, 255)
+    if modo in ('I;16', 'I;16B', 'I;16L'):
+        return 65535, 5140
+    if modo == 'I':
+        return 65535, 5140
+    if modo in ('L', 'F'):
         return 255, 20
     return (255, 255, 255), (20, 20, 20)
 
@@ -221,8 +253,9 @@ def grabar_codigo(img_original, codigo_str, dpi, copiar=True):
     # Pegar con margen de seguridad en ambos ejes (evita que la costura tape el
     # badge). La superficie de las mascaras tiene 'margin' px de aire alrededor
     # del pill: se descuenta para que el margen impreso sea el del pill.
-    margen_px = cm_a_px(BADGE_MARGEN_CM, dpi)
-    pos = (w - mask_pill.width - margen_px + margin, margen_px - margin)
+    margen_sup_px = cm_a_px(BADGE_MARGEN_CM, dpi)
+    margen_lat_px = cm_a_px(BADGE_MARGEN_LATERAL_CM, dpi)
+    pos = (w - mask_pill.width - margen_lat_px + margin, margen_sup_px - margin)
 
     color_pill, color_txt = _colores_badge(img.mode)
     img.paste(color_pill, pos, mask_pill)
@@ -309,7 +342,7 @@ def obtener_dpi(img):
         if dpi_info:
             dpi_x = dpi_info[0]
             if 50 < dpi_x < 1200:
-                return int(dpi_x), True
+                return int(round(dpi_x)), True
     except (TypeError, IndexError, ValueError):
         pass
     return 150, False
@@ -357,6 +390,143 @@ def es_neoprene(nombre):
     return 'neoprene' in n or 'neopreno' in n
 
 
+def calcular_n_panos(lado_cm, ancho_rollo_cm, margen_cm):
+    """
+    Cantidad de panos (3 o mas) en que se divide 'lado_cm' en partes iguales
+    para que cada pano entre en el rollo. Los panos del medio llevan margen de
+    costura de los dos lados, asi que cada uno mide lado/n + 2*margen.
+    Devuelve None si no hay forma (margen mayor que el rollo).
+      400cm de alto -> 3 panos de ~134cm;  500cm de alto -> 4 panos de ~126cm
+    """
+    util = ancho_rollo_cm - 2 * margen_cm
+    if util <= 0:
+        return None
+    n = max(3, math.ceil(lado_cm / util))
+    while lado_cm / n + 2 * margen_cm > ancho_rollo_cm:
+        n += 1
+    return n
+
+
+def cajas_de_corte(ancho_px, alto_px, n, horizontal, margen_px):
+    """
+    Cajas (x1, y1, x2, y2) de n panos iguales sobre el eje elegido. Cada pano
+    se extiende margen_px mas alla de cada corte, asi dos panos vecinos se
+    solapan 2*margen y la maquina de coser lo consume. Para n=2 da exactamente
+    las mismas cajas que el cortador de siempre (corte en lado // 2).
+    """
+    lado = alto_px if horizontal else ancho_px
+    limites = [lado * i // n for i in range(n + 1)]
+    cajas = []
+    for i in range(n):
+        a = limites[i] - margen_px if i > 0 else 0
+        b = limites[i + 1] + margen_px if i < n - 1 else lado
+        a, b = max(0, a), min(lado, b)
+        cajas.append((0, a, ancho_px, b) if horizontal else (a, 0, b, alto_px))
+    return cajas
+
+
+def sufijos_panos(n, horizontal):
+    """SUPERIOR, MEDIO1.., INFERIOR (horizontal) o IZQUIERDO, CENTRO1.., DERECHO."""
+    if horizontal:
+        primero, medio, ultimo = 'SUPERIOR', 'MEDIO', 'INFERIOR'
+    else:
+        primero, medio, ultimo = 'IZQUIERDO', 'CENTRO', 'DERECHO'
+    return [primero] + [f"{medio}{k}" for k in range(1, n - 1)] + [ultimo]
+
+
+def _zona_gris(img, caja):
+    """Recorte chico en escala de grises SOLO para analizar (no se guarda)."""
+    zona = img.crop(caja)
+    if zona.mode.startswith('I') or zona.mode == 'F':
+        zona = zona.convert('F')
+        if zona.getextrema()[1] > 255:      # 16 bits -> 8 bits
+            zona = zona.point(lambda v: v / 257.0)
+        zona = zona.convert('L')
+    elif zona.mode != 'L':
+        zona = zona.convert('L')
+    return zona
+
+
+_LAPLACIANO = ImageFilter.Kernel((3, 3), [0, 1, 0, 1, -4, 1, 0, 1, 0], scale=1, offset=128)
+
+
+def _energia_borde(zona):
+    """Desvio del laplaciano: cuanto detalle fino tiene la zona."""
+    return ImageStat.Stat(zona.filter(_LAPLACIANO)).stddev[0]
+
+
+def evaluar_calidad(img, dpi):
+    """
+    Heuristica de calidad, solo para AVISAR (nunca bloquea ni modifica nada).
+    Mira CALIDAD_ZONAS x CALIDAD_ZONAS recortes chicos a resolucion nativa (no
+    se reescala la imagen entera: estos fondos pesan GB).
+      - Resolucion: DPI < CALIDAD_DPI_MIN.
+      - Borrosa / ampliada: en las zonas con dibujo, el detalle fino (pixel a
+        pixel) es mucho menor que el detalle a escala 1/4. Una imagen ampliada
+        tiene contornos pero no tiene nada entre pixel y pixel. Las zonas lisas
+        (degrades de estudio) se ignoran para no marcarlas como borrosas.
+      - Pixelada: en las zonas con dibujo, casi todos los pixeles son iguales
+        a su vecino (bloques repetidos de una ampliacion "vecino mas cercano").
+    Devuelve (lista de avisos, dict de metricas para el manifiesto).
+    """
+    avisos = []
+    if dpi < CALIDAD_DPI_MIN:
+        avisos.append(f"resolucion baja: {dpi} DPI (recomendado {CALIDAD_DPI_MIN} o mas)")
+
+    w, h = img.size
+    t = min(CALIDAD_MUESTRA_PX, w, h)
+    if t < 64:
+        return avisos, None
+    z = CALIDAD_ZONAS
+    nitideces, periodos = [], []
+    for iy in range(z):
+        for ix in range(z):
+            x = (w - t) * ix // (z - 1)
+            y = (h - t) * iy // (z - 1)
+            zona = _zona_gris(img, (x, y, x + t, y + t))
+            if _energia_borde(zona.resize((t // 4, t // 4), Image.BOX)) < 3:
+                continue              # zona lisa (degrade, cielo): no dice nada
+            mitad = zona.resize((t // 2, t // 2), Image.BOX)
+            nitideces.append(_energia_borde(zona) / max(_energia_borde(mitad), 0.01))
+            periodos.append(_periodicidad_bloques(zona))
+
+    if len(nitideces) < 2:
+        return avisos, {'zonas_con_detalle': len(nitideces)}
+    nitideces.sort()
+    periodos.sort()
+    nitidez = nitideces[len(nitideces) // 2]
+    pixelado = periodos[len(periodos) // 2]
+    if pixelado > CALIDAD_PIXELADO_MAX:
+        avisos.append(f"posible imagen PIXELADA (bloques repetidos, indice {pixelado:.1f})")
+    elif nitidez < CALIDAD_NITIDEZ_MIN:
+        avisos.append(f"posible imagen BORROSA o ampliada (nitidez {nitidez:.2f},"
+                      f" minimo {CALIDAD_NITIDEZ_MIN})")
+    return avisos, {'nitidez': round(nitidez, 2), 'pixelado': round(pixelado, 1),
+                    'zonas_con_detalle': len(nitideces)}
+
+
+def _periodicidad_bloques(zona):
+    """
+    Cuanto se repite un patron de bloques de 2 a 7 pixeles: en una imagen
+    ampliada por "vecino mas cercano" los saltos entre pixeles vecinos caen
+    todos en la misma columna de cada bloque. Devuelve el cociente entre esa
+    columna y el resto (1 = sin patron).
+    """
+    t = zona.width
+    dif = ImageChops.difference(zona.crop((1, 0, t, zona.height)),
+                                zona.crop((0, 0, t - 1, zona.height)))
+    perfil = list(dif.resize((t - 1, 1), Image.BOX).tobytes())
+    mejor = 1.0
+    for k in range(2, 8):
+        fases = [sum(perfil[i::k]) / len(perfil[i::k]) for i in range(k)]
+        pico = max(fases)
+        if pico < 2:
+            continue
+        resto = (sum(fases) - pico) / (k - 1)
+        mejor = max(mejor, pico / max(resto, 0.05))
+    return mejor
+
+
 def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
                     umbral_desp, calidad, codigo):
     """
@@ -396,6 +566,14 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
             f"     Reexportalo desde Photoshop/Illustrator con la resolucion incluida."
         )
 
+    # Calidad (solo aviso): resolucion baja, borrosa/ampliada o pixelada
+    try:
+        avisos_calidad, metricas_calidad = evaluar_calidad(img, dpi)
+    except Exception as e:      # el analisis es solo un aviso: nunca frena el corte
+        avisos_calidad, metricas_calidad = [], {'error': str(e)}
+    for aviso in avisos_calidad:
+        aviso_dpi += f"\n     [aviso] Calidad: {aviso}."
+
     # El nombre puede pedir el eje de corte ("horizontal"/"vertical") y marcar
     # el fondo como neoprene, que no lleva el codigo grabado en la imagen.
     pedido = corte_pedido(nombre)
@@ -416,6 +594,7 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         'dpi': dpi,
         'dpi_del_metadato': dpi_del_metadato,
         'tela': 'neoprene' if neoprene else 'poliester',
+        'calidad': {'avisos': avisos_calidad, **(metricas_calidad or {})},
     }
 
     # --- CASO: entra en el rollo sin corte (y el nombre no pide cortar) ---
@@ -451,15 +630,9 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
             entra = ancho_cm <= ancho_rollo_cm or alto_cm / 2 + margen_cm <= ancho_rollo_cm
         else:
             entra = alto_cm <= ancho_rollo_cm or ancho_cm / 2 + margen_cm <= ancho_rollo_cm
-        if not entra:
-            img.close()
-            datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': [], 'metros_lineales': 0})
-            return "ERROR", (
-                f"[ERROR] {nombre}{ext}\n"
-                f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
-                f"     El nombre pide corte {pedido} pero los panos no entran en el rollo de {ancho_rollo_cm}cm.\n"
-                f"     Este fondo necesita un tratamiento especial." + aviso_dpi
-            ), [], datos
+        # Si 2 panos no entran, se divide en partes iguales en el eje pedido
+        n_panos = 2 if entra else calcular_n_panos(
+            alto_cm if cortar_horizontal else ancho_cm, ancho_rollo_cm, margen_cm)
     else:
         # --- CASO: ambos lados superan el rollo ---
         entra_vert, desp_vert, entra_horiz, desp_horiz = evaluar_corte(
@@ -467,89 +640,81 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         )
 
         if not entra_vert and not entra_horiz:
-            img.close()
-            datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': [], 'metros_lineales': 0})
-            return "ERROR", (
-                f"[ERROR] {nombre}{ext}\n"
-                f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
-                f"     Ningun corte produce panos que entren en el rollo de {ancho_rollo_cm}cm.\n"
-                f"     Este fondo necesita un tratamiento especial." + aviso_dpi
-            ), [], datos
-
-        # Decidir eje de corte
-        if entra_vert and entra_horiz:
-            cortar_horizontal = desp_vert - desp_horiz > umbral_desp
-        elif entra_horiz:
+            # No entra en 2 panos: 3 o mas panos iguales, SIEMPRE en horizontal
+            # (solo se corta vertical si el nombre lo pide).
             cortar_horizontal = True
+            n_panos = calcular_n_panos(alto_cm, ancho_rollo_cm, margen_cm)
         else:
-            cortar_horizontal = False
+            n_panos = 2
+            # Decidir eje de corte
+            if entra_vert and entra_horiz:
+                cortar_horizontal = desp_vert - desp_horiz > umbral_desp
+            elif entra_horiz:
+                cortar_horizontal = True
+            else:
+                cortar_horizontal = False
+
+    if n_panos is None:
+        img.close()
+        datos.update({'panos': 0, 'corte': 'ERROR', 'archivos': [], 'metros_lineales': 0})
+        return "ERROR", (
+            f"[ERROR] {nombre}{ext}\n"
+            f"     {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
+            f"     Ningun corte produce panos que entren en el rollo de {ancho_rollo_cm}cm.\n"
+            f"     Este fondo necesita un tratamiento especial." + aviso_dpi
+        ), [], datos
 
     origen_corte = " (pedido en el nombre)" if pedido else ""
-
     if cortar_horizontal:
-        tipo_corte = "HORIZONTAL (superior / inferior)"
-        mitad = alto_px // 2
-
-        caja_1 = (0, 0, ancho_px, mitad + margen_px)
-        caja_2 = (0, mitad - margen_px, ancho_px, alto_px)
-
-        sufijo_1 = "SUPERIOR"
-        sufijo_2 = "INFERIOR"
-
-        alto_1_cm = px_a_cm(mitad + margen_px, dpi)
-        alto_2_cm = px_a_cm(alto_px - (mitad - margen_px), dpi)
-        medida_1 = f"{ancho_cm:.1f}cm x {alto_1_cm:.1f}cm"
-        medida_2 = f"{ancho_cm:.1f}cm x {alto_2_cm:.1f}cm"
-        largo_1 = max(ancho_cm, alto_1_cm)
-        largo_2 = max(ancho_cm, alto_2_cm)
+        tipo_corte = ("HORIZONTAL (superior / inferior)" if n_panos == 2
+                      else f"HORIZONTAL en {n_panos} panos iguales (de arriba hacia abajo)")
     else:
-        tipo_corte = "VERTICAL (izquierdo / derecho)"
-        mitad = ancho_px // 2
+        tipo_corte = ("VERTICAL (izquierdo / derecho)" if n_panos == 2
+                      else f"VERTICAL en {n_panos} panos iguales (de izquierda a derecha)")
 
-        caja_1 = (0, 0, mitad + margen_px, alto_px)
-        caja_2 = (mitad - margen_px, 0, ancho_px, alto_px)
+    cajas = cajas_de_corte(ancho_px, alto_px, n_panos, cortar_horizontal, margen_px)
+    sufijos = sufijos_panos(n_panos, cortar_horizontal)
 
-        sufijo_1 = "IZQUIERDO"
-        sufijo_2 = "DERECHO"
+    # Nombres de salida: todos los panos llevan el codigo en el nombre
+    nombres = [f"{codigo_str} - {nombre}_{suf}{ext}" for suf in sufijos]
 
-        ancho_1_cm = px_a_cm(mitad + margen_px, dpi)
-        ancho_2_cm = px_a_cm(ancho_px - (mitad - margen_px), dpi)
-        medida_1 = f"{ancho_1_cm:.1f}cm x {alto_cm:.1f}cm"
-        medida_2 = f"{ancho_2_cm:.1f}cm x {alto_cm:.1f}cm"
-        largo_1 = max(ancho_1_cm, alto_cm)
-        largo_2 = max(ancho_2_cm, alto_cm)
-
-    # Nombres de salida: ambos panos llevan el codigo en el nombre
-    nombre_1 = f"{codigo_str} - {nombre}_{sufijo_1}{ext}"
-    nombre_2 = f"{codigo_str} - {nombre}_{sufijo_2}{ext}"
-
-    ruta_1 = os.path.join(carpeta_salida, nombre_1)
-    ruta_2 = os.path.join(carpeta_salida, nombre_2)
-
-    # Badge en SUPERIOR (corte horizontal) o DERECHO (corte vertical), siempre
-    # invertido. El neoprene no lleva badge en ningun pano.
-    pano_badge = None if neoprene else (nombre_1 if cortar_horizontal else nombre_2)
+    # Badge en el SUPERIOR (corte horizontal) o el DERECHO (corte vertical).
+    # El neoprene no lleva badge en ningun pano.
+    idx_badge = None if neoprene else (0 if cortar_horizontal else n_panos - 1)
 
     # Un pano por vez: recortar, grabar, guardar y liberar antes de pasar al
-    # siguiente. Tener los dos vivos a la vez duplica el pico de RAM, que en
+    # siguiente. Tener varios vivos a la vez multiplica el pico de RAM, que en
     # estos fondos se mide en GB.
-    for caja, ruta, lleva_badge in ((caja_1, ruta_1, nombre_1 == pano_badge),
-                                    (caja_2, ruta_2, nombre_2 == pano_badge)):
+    for k, (caja, nombre_pano) in enumerate(zip(cajas, nombres)):
         pano = img.crop(caja)
-        if lleva_badge:
+        if k == idx_badge:
             pano = grabar_codigo(pano, codigo_str, dpi, copiar=False)
-        _guardar(pano, ruta, ext, calidad, dpi_tuple, meta)
+        _guardar(pano, os.path.join(carpeta_salida, nombre_pano), ext, calidad, dpi_tuple, meta)
         pano.close()
         del pano
 
     img.close()
 
-    metros_lineales = [largo_1, largo_2]
+    metros_lineales = []
+    lineas = []
+    aviso_largo = ""
+    for k, ((x1, y1, x2, y2), nombre_pano) in enumerate(zip(cajas, nombres)):
+        pw_cm = px_a_cm(x2 - x1, dpi)
+        ph_cm = px_a_cm(y2 - y1, dpi)
+        largo = max(pw_cm, ph_cm)
+        metros_lineales.append(largo)
+        marca = '  [codigo grabado]' if k == idx_badge else ''
+        lineas.append(f"     -> {nombre_pano}  ({pw_cm:.1f}cm x {ph_cm:.1f}cm)"
+                      f" | Lineal: {largo / 100:.2f}m{marca}")
+        if largo > LARGO_ROLLO_CM and not aviso_largo:
+            aviso_largo = (f"\n     [aviso] Hay panos de {largo / 100:.2f}m: superan el largo"
+                           f" del rollo ({LARGO_ROLLO_CM / 100:.0f}m).")
+
     datos.update({
-        'panos': 2,
+        'panos': n_panos,
         'corte': 'HORIZONTAL' if cortar_horizontal else 'VERTICAL',
-        'archivos': [nombre_1, nombre_2],
-        'metros_lineales': round((largo_1 + largo_2) / 100, 2),
+        'archivos': nombres,
+        'metros_lineales': round(sum(metros_lineales) / 100, 2),
     })
 
     msg = (
@@ -557,9 +722,7 @@ def procesar_imagen(ruta_archivo, carpeta_salida, margen_cm, ancho_rollo_cm,
         f"     Original: {ancho_cm:.1f}cm x {alto_cm:.1f}cm @ {dpi} DPI\n"
         f"     Corte: {tipo_corte}{origen_corte}\n"
         f"     Margen de costura: {margen_cm}cm ({margen_px}px)\n"
-        f"     -> {nombre_1}  ({medida_1}) | Lineal: {largo_1 / 100:.2f}m{'  [codigo grabado]' if nombre_1 == pano_badge else ''}\n"
-        f"     -> {nombre_2}  ({medida_2}) | Lineal: {largo_2 / 100:.2f}m{'  [codigo grabado]' if nombre_2 == pano_badge else ''}"
-        + aviso_dpi
+        + "\n".join(lineas) + aviso_largo + aviso_dpi
     )
     return "OK", msg, metros_lineales, datos
 
@@ -607,7 +770,7 @@ def main():
         'carpeta',
         nargs='?',
         default='.',
-        help='Carpeta con los archivos JPG (default: carpeta actual)'
+        help='Carpeta con los archivos JPG/PNG (default: carpeta actual)'
     )
     parser.add_argument(
         '--margen',
@@ -785,6 +948,14 @@ def main():
     if sin_dpi:
         print("  [AVISO] Sin densidad declarada: " + ", ".join(sin_dpi))
         print("          Sus medidas y metros lineales son estimados a 150 DPI.")
+        print("")
+
+    con_calidad = [d['codigo'] for d in medidas_reales
+                   if d.get('calidad', {}).get('avisos')]
+    if con_calidad:
+        print("  [AVISO] Revisar calidad (baja resolucion, borrosa o pixelada): "
+              + ", ".join(con_calidad))
+        print("          Es una deteccion orientativa: mirar el archivo antes de imprimir.")
         print("")
 
     # Guardar ultimo codigo usado para la proxima corrida

@@ -42,14 +42,17 @@ except ImportError:
     input("Enter para salir...")
     sys.exit(1)
 
-# ── tarifas (Marzo 2026) ──────────────────────────────────────────────────────
+# ── tarifas (Marzo 2026, +15% vs Q4-2025) ──────────────────────────────────────────────────────
 PRECIO_1_PANO       = 2_180   # Sin costura / entra en rollo
-PRECIO_UNION_CORTA  = 4_350   # 2 paños, unión <= 450 cm
-PRECIO_UNION_LARGA  = 6_950   # 2 paños, unión > 450 cm
+PRECIO_UNION_CORTA  = 4_350   # Por cada unión de hasta 450 cm (inclusive)
+PRECIO_UNION_LARGA  = 6_950   # Por cada unión de más de 450 cm
 PRECIO_NEOPRENE     = 2_350   # Fijo, sin importar medida
-VIATICOS            = 5_000   # Fijo por cierre
+VIATICOS            = 6_000   # Fijo por cierre
+# Un fondo en N paños lleva N-1 uniones y se cobra una tarifa por unión
+# (3 paños = 2 uniones).
 
 ROLL_MAX_CM         = 160     # Ancho máximo del rollo
+MARGEN_CM           = 0.45    # Margen de costura por lado (igual que el cortador)
 UNION_THRESHOLD_CM  = 450     # 4,5 m en cm
 
 # ── logo (completar con LOGO_B64 de generar_lista_etiquetado.py) ──────────────
@@ -109,10 +112,25 @@ def detectar_especial(nombre_base):
     return None
 
 
+def cotizar_uniones(n_panos, largo_union_cm):
+    """
+    Precio de un fondo en n_panos (2 o mas): una tarifa por cada union, segun
+    el largo de la costura (<= 450cm corta, > 450cm larga).
+    Retorna (descripcion, precio, False).
+    """
+    uniones = n_panos - 1
+    corta = largo_union_cm <= UNION_THRESHOLD_CM
+    tarifa = PRECIO_UNION_CORTA if corta else PRECIO_UNION_LARGA
+    tramo = "hasta 4,5 m" if corta else "de mas de 4,5 m"
+    if uniones == 1:
+        return "Union %s" % tramo, tarifa, False
+    return "%d uniones %s (%d panos)" % (uniones, tramo, n_panos), tarifa * uniones, False
+
+
 def calcular_costura(ancho_cm, alto_cm, tipo_especial):
     """
-    Retorna (descripcion: str, precio: int|None, advertencia: bool).
-    advertencia=True -> mas de 2 panos, precio=None, fila en blanco.
+    Cotiza re-deduciendo el corte desde la medida (solo cuando falta el
+    manifiesto del cortador). Retorna (descripcion, precio|None, advertencia).
     """
     if tipo_especial == "neoprene":
         return "Piso Neoprene", PRECIO_NEOPRENE, False
@@ -129,23 +147,25 @@ def calcular_costura(ancho_cm, alto_cm, tipo_especial):
     puede_h = panel_h <= ROLL_MAX_CM
 
     if not puede_v and not puede_h:
-        return "Multiples panos (cotizar manual)", None, True
+        # Igual que el cortador: 3 o mas panos iguales en horizontal; las
+        # uniones corren a lo ancho.
+        util = ROLL_MAX_CM - 2 * MARGEN_CM
+        n = max(3, int(math.ceil(alto_cm / util)))
+        while alto_cm / n + 2 * MARGEN_CM > ROLL_MAX_CM:
+            n += 1
+        return cotizar_uniones(n, ancho_cm)
 
     # Preferir corte vertical; la union corre a lo largo del otro lado
     longitud = alto_cm if puede_v else ancho_cm
-
-    if longitud <= UNION_THRESHOLD_CM:
-        return "Union hasta 4,5 m", PRECIO_UNION_CORTA, False
-    else:
-        return "Union de 4,5 m en adelante", PRECIO_UNION_LARGA, False
+    return cotizar_uniones(2, longitud)
 
 
 def calcular_costura_real(real, tipo_especial):
     """
     Cotiza con el corte que el cortador hizo de verdad (medidas_reales.json:
     'panos' y 'corte'), no con uno re-deducido. Asi un fondo cortado por pedido
-    del nombre ("horizontal"/"vertical") o por el umbral de desperdicio se cobra
-    con la union correcta.
+    del nombre ("horizontal"/"vertical"), por el umbral de desperdicio o en 3+
+    panos se cobra con las uniones correctas.
     Retorna lo mismo que calcular_costura, o None si el manifiesto no alcanza.
     """
     if tipo_especial == "neoprene":
@@ -155,12 +175,10 @@ def calcular_costura_real(real, tipo_especial):
     corte = real.get("corte")
     if panos == 1:
         return "1 Pano", PRECIO_1_PANO, False
-    if panos == 2 and corte in ("VERTICAL", "HORIZONTAL"):
-        # La union corre a lo largo del lado que el corte no parte
+    if isinstance(panos, int) and panos >= 2 and corte in ("VERTICAL", "HORIZONTAL"):
+        # Las uniones corren a lo largo del lado que el corte no parte
         longitud = real["alto_cm"] if corte == "VERTICAL" else real["ancho_cm"]
-        if longitud <= UNION_THRESHOLD_CM:
-            return "Union hasta 4,5 m", PRECIO_UNION_CORTA, False
-        return "Union de 4,5 m en adelante", PRECIO_UNION_LARGA, False
+        return cotizar_uniones(panos, longitud)
     return None
 
 
@@ -474,8 +492,8 @@ def generar_pdf_costura(carpeta_origen, cierre=None, sin_pausa=False, cot=None):
                        color=colors.HexColor("#856404")),
             Spacer(1, 2*mm),
             Paragraph(
-                "ATENCION: los siguientes fondos requieren mas de 2 panos "
-                "y deben cotizarse manualmente:", s_a
+                "ATENCION: los siguientes fondos no se pudieron cotizar "
+                "automaticamente y deben cotizarse manualmente:", s_a
             ),
         ]
         for a in advertencias:

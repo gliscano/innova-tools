@@ -107,17 +107,28 @@ printed and billed — confirm before touching.
   overlap by 0.9cm and the sewing machine consumes it.
 - **Cut axis**: when both axes yield panels that fit, prefer vertical (less visible
   seam) unless horizontal saves more than `UMBRAL_DESPERDICIO` = 30cm of fabric.
-  When neither axis fits, the design is flagged as an error needing manual handling.
+- **3+ panels**: when neither 2-panel cut fits, `calcular_n_panos` splits the *alto*
+  into n >= 3 equal HORIZONTAL panels (`lado/n + 2*margen <= rollo`; middle panels
+  carry margin on both sides) — vertical only if the filename says "vertical". Owner
+  examples: 500x400 -> 3 panels of 500x~134; 1200x500 -> 4 of 1200x~126. The 2-panel
+  logic above is deliberately unchanged (owner's decision). `cajas_de_corte` builds
+  the boxes for any n and reproduces the old 2-panel boxes exactly (`lado*i//n`).
+  Suffixes: `_SUPERIOR`, `_MEDIO1..`, `_INFERIOR` / `_IZQUIERDO`, `_CENTRO1..`,
+  `_DERECHO` (`sufijos_panos`). A panel longer than `LARGO_ROLLO_CM` (1000) only
+  warns.
 - **Forced axis by filename**: "horizontal" or "vertical" in the name (`corte_pedido`)
   skips the no-cut branch and *always* cuts on that axis, even if the design fits
-  the roll; if the forced panels do not fit, it is an ERROR. Both words → warning,
+  the roll; if 2 forced panels do not fit, it cuts n >= 3 on that axis. Both words → warning,
   normal logic. This is an extra branch; the automatic logic above is unchanged.
 - **Neoprene** ("neoprene"/"neopreno", `es_neoprene`): no badge burned on any panel,
   but the `CODnnn - ` filename prefix stays (every downstream stage keys on it).
   Its meters count as neoprene fabric; everything else is polyester.
 - **Sewing tariffs** (`costura/generar_costura.py`, marked "Marzo 2026"): 2180 one
-  panel / 4350 join <= 450cm (`UNION_THRESHOLD_CM`) / 6950 join > 450cm / 2350
-  neoprene, plus 5000 fixed viáticos, total rounded up to the next 1000.
+  panel / 4350 join <= 450cm inclusive (`UNION_THRESHOLD_CM`) / 6950 join > 450cm /
+  2350 neoprene, plus 6000 fixed viáticos, total rounded up to the next 1000. A
+  design in n panels pays n-1 joins (`cotizar_uniones`), each priced by join length.
+  The "largo útil <= 2,5m" on the owner's tariff sheet is informative: one panel is
+  always 2180 (confirmed).
   "neoprene"/"neopreno" in a filename selects the neoprene price. `detectar_especial`
   also recognizes "funda", but a funda has no tariff of its own (confirmed by the
   owner) and is priced like any other design — that is intended, not a gap.
@@ -165,13 +176,23 @@ no forced axis), which can disagree with what `cortador` did.
 
 ## Filename contract
 
+- **Quality check** (`evaluar_calidad`, warning only, wrapped in try/except): DPI <
+  72; blur = median over 25 native-resolution 512px tiles of Laplacian energy vs the
+  same tile at 1/2 scale (`CALIDAD_NITIDEZ_MIN` 0.47); pixelation = periodicity of
+  neighbor-pixel jumps at block sizes 2-7 (`CALIDAD_PIXELADO_MAX` 3.0). Flat tiles
+  are skipped so studio gradients are not flagged. Calibrated on scikit-image's
+  sample photos: no original flagged, all nearest-neighbor upscales caught, most 2x+
+  bicubic/blurred caught, 1.5x not. Results go to the manifest under `calidad`.
+
 `cortados/` filenames are the interface between the stages — there is no database.
 Every consumer re-parses them with its own near-duplicate regexes (`COD_RE`,
 `MED_RE`): `etiquetador`, `costura`, and `index.html`. The Python `parse_name` in
 `etiquetador` is a line-by-line port of `parseName` in `index.html`; fix a parsing
 bug in one and check the other two. Both strip the cortador's `_IZQUIERDO`/
 `_DERECHO`/`_SUPERIOR`/`_INFERIOR` suffix from the observation separately
-(`PANO_RE`), because `_` is a word character and `SUF_RE`'s `` never matches it.
+(`PANO_RE`, which also covers `_MEDIOn`/`_CENTROn` and is anchored `(?:^|_)` because
+`clean()` eats the `_` when there is no observation), because `_` is a word character
+and `SUF_RE`'s `\b` never matches it.
 
 ```
 COD001 - Cliente Nombre - 290x200 - Observacion.jpg
@@ -198,7 +219,10 @@ uses on labeling day.
 - Tracks pendiente/impreso per design in `localStorage` under
   `innova_estado::<cierre>::<codigoNum>`, plus `innova_cierre` for the current batch.
 - Reprints 50x50mm labels on demand via jsPDF, so a single label can be redone
-  without regenerating the whole `etiquetas_<cierre>.pdf`.
+  without regenerating the whole `etiquetas_<cierre>.pdf`. `addLabel(doc, item)` and
+  the Python `generar_pdf_etiquetas` draw the same layout (logo, client, bold
+  `COD%03d` code as burned into the image, thanks line, 17mm QR, footer, all within
+  2-46mm from the top) — change both together.
 
 The JSON is the contract between Python and this page, versioned by the
 `innova_etiquetado: 2` key:
@@ -222,14 +246,18 @@ together, and bumping the version key.
   the script. `main()` prompts for a starting code (blank = last + 1). The file is
   **tracked**, so every real run leaves it modified in the working tree — don't
   commit a counter bump by accident.
-- **The badge lands on the second panel for vertical cuts** (`DERECHO`), on the first
-  for horizontal (`SUPERIOR`) — see `pano_badge` in `procesar_imagen`. Neoprene gets
+- **The badge lands on the last panel for vertical cuts** (`DERECHO`), on the first
+  for horizontal (`SUPERIOR`) — see `idx_badge` in `procesar_imagen`. Neoprene gets
   none.
 - The badge is drawn rotated 90° counter-clockwise with a **fixed printed size in
-  cm** (`BADGE_LETRA_CM` 0.8, `BADGE_LARGO_MAX_CM` 4.0, `BADGE_MARGEN_CM` 0.5),
+  cm** (`BADGE_LETRA_CM` 0.76, `BADGE_LARGO_MAX_CM` 3.8, `BADGE_MARGEN_CM` 0.5 from
+  the top, `BADGE_MARGEN_LATERAL_CM` 2.5 from the right edge, which the side hem used
+  to swallow),
   converted to px with the file's DPI — `grabar_codigo` takes `dpi`. It must fit in
   the top pocket, which is 5cm on the smallest backdrops (7.5cm otherwise), so
-  margin + length stays <= 4.5cm; long codes shrink the font to fit. It used to be a
+  margin + length stays <= 4.5cm; long codes shrink the font to fit. `_colores_badge`
+  also covers PNG modes `LA` and `I;16` (the old code crashed on them and aborted the
+  whole run). It used to be a
   fixed 56px, which printed ~7.7cm long on a 72dpi file and overflowed the pocket.
 - **Docs are split by audience.** `README.md` is the technical reference;
   `INSTRUCCIONES.md` is the single operator manual for the whole weekly flow

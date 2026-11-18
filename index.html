@@ -688,7 +688,7 @@ function parseName(filename){
   const clean=s=>s.replace(/^[\s\-_–·.|]+|[\s\-_–·.|]+$/g,'').replace(/\s+/g,' ').trim();
   cliente=clean(cliente);
   cliente=cliente?titleCase(cliente):'(sin nombre)';
-  observacion=clean(observacion).replace(/_(izquierdo|derecho|superior|inferior)$/i,'');
+  observacion=clean(observacion).replace(/(?:^|_)(izquierdo|derecho|superior|inferior|medio\d*|centro\d*)$/i,'');
   observacion=observacion.replace(/\b(izq|der|sup|inf|izquierd[oa]|derech[oa]|superior|inferior|pa[ñn]o\s*\d*)\b/gi,'');
   observacion=clean(observacion);
   if(/^x$/i.test(observacion))observacion='';
@@ -807,29 +807,37 @@ $('modalX').onclick=closeModal;$('modal').onclick=e=>{if(e.target.id==='modal')c
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
 function fitText(doc,t,maxW,s,min){let pt=s;doc.setFontSize(pt);while(doc.getTextWidth(t)>maxW&&pt>min){pt-=0.5;doc.setFontSize(pt);}return pt;}
-function addLabel(doc,name){
-  const P=50,lw=34,lh=lw*LOGO_RATIO;
-  doc.addImage(LOGO_B64,'PNG',(P-lw)/2,2.4,lw,lh);
+function addLabel(doc,it){
+  // 50x50mm: todo el contenido queda entre 2mm y 46mm desde arriba.
+  const P=50,lw=30,lh=lw*LOGO_RATIO,name=it.cliente;
+  const cod=(typeof it.codigoNum==='number')?'COD'+String(it.codigoNum).padStart(3,'0'):'';
+  doc.addImage(LOGO_B64,'PNG',(P-lw)/2,2.0,lw,lh);
+  const dot=2.0+lh+1.4;
   doc.setDrawColor(20,20,20);doc.setLineWidth(0.4);
-  if(doc.setLineDashPattern)doc.setLineDashPattern([0.6,0.8],0);
-  doc.line(6,2.4+lh+1.6,44,2.4+lh+1.6);
+  if(doc.setLineDashPattern)doc.setLineDashPattern([0.7,0.9],0);
+  doc.line(7,dot,43,dot);
   if(doc.setLineDashPattern)doc.setLineDashPattern([],0);
-  doc.setFont('helvetica','normal');doc.setTextColor(15,14,12);
-  const pt=fitText(doc,name,43,11,7);doc.setFontSize(pt);
-  doc.text(name,P/2,16.0,{align:'center'});
-  doc.setFontSize(9.5);
-  doc.text('\u00A1Gracias por elegirnos!',P/2,20.4,{align:'center'});
-  const q=20.5;doc.addImage(QR_B64,'PNG',(P-q)/2,22,q,q);
-  doc.setFontSize(6.6);
-  doc.text('Tu opini\u00F3n cuenta. Contanos tu',P/2,45.6,{align:'center'});
-  doc.text('experiencia en Google',P/2,48.3,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setTextColor(0,0,0);
+  const nameY=dot+4.0;
+  const pt=fitText(doc,name,42,9.5,6);doc.setFontSize(pt);
+  doc.text(name,P/2,nameY,{align:'center'});
+  const codY=nameY+3.6;
+  if(cod){doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(cod,P/2,codY,{align:'center'});doc.setFont('helvetica','normal');}
+  const grY=codY+3.5;
+  doc.setFontSize(7.5);
+  doc.text('\u00A1Gracias por elegirnos!',P/2,grY,{align:'center'});
+  const q=17,qY=grY+1.3;doc.addImage(QR_B64,'PNG',(P-q)/2,qY,q,q);
+  const pieY=qY+q+2.4;
+  doc.setFontSize(6);
+  doc.text('Tu opini\u00F3n cuenta. Contanos tu',P/2,pieY,{align:'center'});
+  doc.text('experiencia en Google',P/2,pieY+2.4,{align:'center'});
 }
 function printItems(list){
   list=list.filter(Boolean);
   if(!list.length){toast('No hay nada seleccionado');return;}
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:[50,50],compress:true});
-  list.forEach((it,i)=>{if(i>0)doc.addPage([50,50]);addLabel(doc,it.cliente);});
+  list.forEach((it,i)=>{if(i>0)doc.addPage([50,50]);addLabel(doc,it);});
   doc.save('etiquetas_'+getCierre().replace(/[^\w\-]+/g,'-')+'_'+list.length+'.pdf');
   if($('autoMark').checked){list.forEach(it=>setEstado(it.codigoNum,'impreso'));render();}
   toast('PDF generado: '+list.length+' etiqueta(s)');
