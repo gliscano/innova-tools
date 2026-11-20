@@ -126,7 +126,9 @@ printed and billed — confirm before touching.
 - **Sewing tariffs** (`costura/generar_costura.py`, marked "Marzo 2026"): 2180 one
   panel / 4350 join <= 450cm inclusive (`UNION_THRESHOLD_CM`) / 6950 join > 450cm /
   2350 neoprene, plus 6000 fixed viáticos, total rounded up to the next 1000. A
-  design in n panels pays n-1 joins (`cotizar_uniones`), each priced by join length.
+  design in n >= 3 panels pays one join tariff (by join length) plus 50% of it per
+  panel beyond 2 (`cotizar_uniones`, `RECARGO_PANO_ADICIONAL`): 3 panels > 450cm =
+  10425, 4 panels = 13900 (owner's examples).
   The "largo útil <= 2,5m" on the owner's tariff sheet is informative: one panel is
   always 2180 (confirmed).
   "neoprene"/"neopreno" in a filename selects the neoprene price. `detectar_especial`

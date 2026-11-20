@@ -44,12 +44,14 @@ except ImportError:
 
 # ── tarifas (Marzo 2026, +15% vs Q4-2025) ──────────────────────────────────────────────────────
 PRECIO_1_PANO       = 2_180   # Sin costura / entra en rollo
-PRECIO_UNION_CORTA  = 4_350   # Por cada unión de hasta 450 cm (inclusive)
-PRECIO_UNION_LARGA  = 6_950   # Por cada unión de más de 450 cm
+PRECIO_UNION_CORTA  = 4_350   # 2 paños, unión de hasta 450 cm (inclusive)
+PRECIO_UNION_LARGA  = 6_950   # 2 paños, unión de más de 450 cm
 PRECIO_NEOPRENE     = 2_350   # Fijo, sin importar medida
 VIATICOS            = 6_000   # Fijo por cierre
-# Un fondo en N paños lleva N-1 uniones y se cobra una tarifa por unión
-# (3 paños = 2 uniones).
+RECARGO_PANO_ADICIONAL = 0.5  # 3+ paños: tarifa de unión + 50% de esa tarifa
+                              # por cada paño adicional a 2.
+                              # 3 paños > 4,5 m = 6.950 + 3.475 = 10.425
+                              # 4 paños > 4,5 m = 6.950 + 2 x 3.475 = 13.900
 
 ROLL_MAX_CM         = 160     # Ancho máximo del rollo
 MARGEN_CM           = 0.45    # Margen de costura por lado (igual que el cortador)
@@ -114,17 +116,21 @@ def detectar_especial(nombre_base):
 
 def cotizar_uniones(n_panos, largo_union_cm):
     """
-    Precio de un fondo en n_panos (2 o mas): una tarifa por cada union, segun
-    el largo de la costura (<= 450cm corta, > 450cm larga).
+    Precio de un fondo en n_panos (2 o mas): la tarifa de union segun el largo
+    de la costura (<= 450cm corta, > 450cm larga) mas RECARGO_PANO_ADICIONAL
+    (50%) de esa tarifa por cada pano por encima de 2.
     Retorna (descripcion, precio, False).
     """
-    uniones = n_panos - 1
+    adicionales = n_panos - 2
     corta = largo_union_cm <= UNION_THRESHOLD_CM
     tarifa = PRECIO_UNION_CORTA if corta else PRECIO_UNION_LARGA
     tramo = "hasta 4,5 m" if corta else "de mas de 4,5 m"
-    if uniones == 1:
+    if adicionales <= 0:
         return "Union %s" % tramo, tarifa, False
-    return "%d uniones %s (%d panos)" % (uniones, tramo, n_panos), tarifa * uniones, False
+    precio = int(round(tarifa + tarifa * RECARGO_PANO_ADICIONAL * adicionales))
+    return ("Union %s + %d pano%s adicional%s (%d panos)"
+            % (tramo, adicionales, "s" if adicionales > 1 else "",
+               "es" if adicionales > 1 else "", n_panos)), precio, False
 
 
 def calcular_costura(ancho_cm, alto_cm, tipo_especial):

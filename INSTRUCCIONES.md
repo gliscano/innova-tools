@@ -236,11 +236,11 @@ La única diferencia contra el original es la mínima pérdida de volver a compr
 | Al menos un lado ≤ 160cm (entra en el rollo) | **1 Paño** | $ 2.180 |
 | Cortado en 2 paños, unión de hasta 450cm (inclusive) | **Unión hasta 4,5 m** | $ 4.350 |
 | Cortado en 2 paños, unión de más de 450cm | **Unión de más de 4,5 m** | $ 6.950 |
-| Cortado en 3 o más paños | **N uniones** (una tarifa de unión por cada costura: 3 paños = 2 uniones) | 2 × $ 4.350 o 2 × $ 6.950, según el largo de la unión |
+| Cortado en 3 o más paños | **Unión + paños adicionales**: la tarifa de unión (según su largo) más el **50% de esa tarifa por cada paño adicional** a los 2 | 3 paños: $ 6.525 o $ 10.425 · 4 paños: $ 8.700 o $ 13.900 |
 | El nombre del archivo dice "neoprene" o "neopreno" | **Piso Neoprene** (no importa la medida) | $ 2.350 |
 | Viáticos | Una vez por cierre, fila aparte | $ 6.000 |
 
-Ejemplo: un fondo de 5m × 4m sale en 3 paños horizontales; cada unión mide 5m (más de 4,5m), así que se cobra 2 × $ 6.950 = $ 13.900.
+Ejemplos: un fondo de 6m × 4,15m sale en 3 paños horizontales; la unión mide 6m (más de 4,5m): $ 6.950 + 50% por 1 paño adicional ($ 3.475) = **$ 10.425**. Un fondo de 4 paños con uniones de más de 4,5m: $ 6.950 + 2 × $ 3.475 = **$ 13.900**.
 
 Tarifas vigentes a **marzo 2026** (+15% sobre el último trimestre de 2025). El total se **redondea para arriba al próximo múltiplo de $1.000**; el subtotal sin redondear aparece en letra chica debajo de la tabla para poder controlar la cuenta.
 

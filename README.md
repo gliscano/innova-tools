@@ -36,7 +36,7 @@ El flujo completo se ejecuta en cadena automáticamente al lanzar el cortador:
 - Cierra la corrida en consola con el estado de etiquetado y costura (`finalizado` / `error`) y el mismo resumen de producción.
 
 ### 3. Costura (`costura/`)
-- Lee `cortados/` y calcula el tipo y costo de costura por diseño según sus dimensiones. Tarifas marzo 2026: 1 paño $2.180, unión ≤ 450 cm $4.350, unión > 450 cm $6.950, neoprene $2.350, viáticos $6.000 por cierre. Un fondo en N paños paga N−1 uniones.
+- Lee `cortados/` y calcula el tipo y costo de costura por diseño según sus dimensiones. Tarifas marzo 2026: 1 paño $2.180, unión ≤ 450 cm $4.350, unión > 450 cm $6.950, neoprene $2.350, viáticos $6.000 por cierre. Un fondo en 3 o más paños paga la tarifa de unión + 50% de esa tarifa por cada paño adicional a 2 (3 paños > 4,5 m = $10.425; 4 paños = $13.900).
 - Toma la **medida real** y el **corte real** (paños y eje) desde `cortados/medidas_reales.json` (incluye los 15cm del bolsillo superior, que el nombre del cliente no trae); si ese archivo falta, avisa, recurre al nombre y deduce el corte por su cuenta.
 - Genera `costura/costura_<cierre>.pdf` con tabla de precios y total del lote.
 
